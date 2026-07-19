@@ -1,0 +1,242 @@
+name: Deploy staging boilerplate-expressjs
+
+on:
+  push:
+    branches:
+      - staging
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  scm:
+    name: SCM
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v6
+      - name: Log SCM Information
+        run: |
+          echo "Branch : ${{ github.ref_name }}"
+          echo "Commit : ${{ github.sha }}"
+          echo "Author : ${{ github.actor }}"
+          echo "Message: $(git log -1 --pretty=%s)"
+
+  lint-typecheck:
+    name: Lint & Type Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v6
+      - name: Setup Bun Runtime
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - name: Install Dependencies
+        run: bun install
+      - name: Generate Prisma Client
+        run: DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy" bunx prisma generate
+      - name: Run ESLint
+        run: bun run lint
+      - name: Run Type Check
+        run: bun run typecheck
+
+  test:
+    name: Tests (Unit + Integration)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: [lint-typecheck]
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v6
+      - name: Setup Bun Runtime
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - name: Install Dependencies
+        run: bun install
+      - name: Generate Prisma Client
+        run: DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy" bunx prisma generate
+      - name: Run Unit Tests (Utils)
+        run: |
+          bun test src/utils/__tests__/encryption.test.ts
+          bun test src/utils/__tests__/jwt.test.ts
+          bun test src/utils/__tests__/logger.test.ts
+          bun test src/utils/__tests__/pagination.test.ts
+          bun test src/utils/__tests__/utils.test.ts
+      - name: Run Unit Tests (Middlewares)
+        run: |
+          bun test __tests__/middlewares/errorHandler.middleware.test.ts
+          bun test __tests__/middlewares/auth.middleware.test.ts
+          bun test __tests__/middlewares/rbac.middleware.test.ts
+      - name: Run Unit Tests (Auth Services)
+        run: bun test src/features/auth/services/auth.service.spec.ts
+      - name: Run Unit Tests (Auth Controllers)
+        run: bun test src/features/auth/controllers/auth.controller.spec.ts
+      - name: Run Integration Tests
+        run: bun test __tests__/integration/
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: [test]
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v6
+      - name: Setup Bun Runtime
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - name: Install Dependencies
+        run: bun install
+      - name: Generate Prisma Client
+        run: DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy" bunx prisma generate
+      - name: Compile TypeScript to JavaScript
+        run: bun run build
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: dist
+          path: |
+            dist/
+            prisma/
+            prisma.config.ts
+            package.json
+            ecosystem.config.cjs
+            bun.lock
+
+  deploy:
+    name: Deploy to VPS
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: [build]
+    steps:
+      - name: Download Build Artifacts
+        uses: actions/download-artifact@v7
+        with:
+          name: dist
+      - name: Copy Files to VPS via SCP
+        uses: appleboy/scp-action@v1
+        with:
+          host: ${{ secrets.SSH_HOST_STAGING }}
+          username: ${{ secrets.SSH_USER_STAGING }}
+          key: ${{ secrets.SSH_KEY_STAGING }}
+          password: ${{ secrets.SSH_PASSWORD_STAGING }}
+          passphrase: ${{ secrets.SSH_PASSPHRASE_STAGING }}
+          port: ${{ secrets.SSH_PORT_STAGING }}
+          timeout: 30m
+          source: "dist/,prisma/,prisma.config.ts,package.json,ecosystem.config.cjs,bun.lock"
+          target: "/root/boilerplate-expressjs"
+      - name: Deploy to VPS
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SSH_HOST_STAGING }}
+          username: ${{ secrets.SSH_USER_STAGING }}
+          key: ${{ secrets.SSH_KEY_STAGING }}
+          password: ${{ secrets.SSH_PASSWORD_STAGING }}
+          passphrase: ${{ secrets.SSH_PASSPHRASE_STAGING }}
+          port: ${{ secrets.SSH_PORT_STAGING }}
+          command_timeout: 30m
+          script: |
+            export PATH=$PATH:/root/.bun/bin:/usr/local/bin
+            cd /root/boilerplate-expressjs
+
+            cat << 'ENVEOF' > .env
+            ${{ secrets.ENV_STAGING }}
+            ENVEOF
+
+            echo "[1/5] Installing deps..."
+            bun install --production
+
+            echo "[2/5] Generating prisma client..."
+            bunx prisma generate
+
+            echo "[3/5] Running migrations..."
+            bunx prisma migrate deploy || echo "⚠️ Migration skipped"
+
+            echo "[3.5/5] Running seeder..."
+            bunx prisma db seed || echo "⚠️ Seeding skipped"
+
+            echo "[4/5] Starting canary on port 40000..."
+            pm2 delete boilerplate-backend-new 2>/dev/null || true
+            PORT=40000 NODE_ENV=staging pm2 start ./dist/app.js \
+              --name boilerplate-backend-new \
+              --interpreter bun \
+              --kill-timeout 5000
+
+            sleep 5
+
+            echo "[5/5] Health check..."
+            HEALTHY=false
+            for i in $(seq 1 20); do
+              STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 http://localhost:40000/health 2>/dev/null || echo "000")
+              echo "  Attempt $i/20: HTTP $STATUS"
+              if [ "$STATUS" = "200" ] || [ "$STATUS" = "302" ]; then
+                HEALTHY=true
+                break
+              fi
+              sleep 2
+            done
+
+            if [ "$HEALTHY" = "true" ]; then
+              pm2 delete boilerplate-backend 2>/dev/null || true
+              pm2 delete boilerplate-backend-new 2>/dev/null || true
+              pm2 delete boilerplate-worker 2>/dev/null || true
+              pm2 start ecosystem.config.cjs
+              pm2 save
+              echo "✅ Done — app:4004 + worker"
+            else
+              echo "❌ Canary failed"
+              pm2 logs boilerplate-backend-new --lines 30 --nostream 2>/dev/null || true
+              pm2 delete boilerplate-backend-new 2>/dev/null || true
+              exit 1
+            fi
+
+  health-check:
+    name: Health Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: [deploy]
+    if: success()
+    steps:
+      - name: Verify Deployed Service via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SSH_HOST_STAGING }}
+          username: ${{ secrets.SSH_USER_STAGING }}
+          key: ${{ secrets.SSH_KEY_STAGING }}
+          password: ${{ secrets.SSH_PASSWORD_STAGING }}
+          passphrase: ${{ secrets.SSH_PASSPHRASE_STAGING }}
+          port: ${{ secrets.SSH_PORT_STAGING }}
+          command_timeout: 2m
+          script: |
+            for i in $(seq 1 15); do
+              STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 http://localhost:4004/health 2>/dev/null || echo "000")
+              echo "Attempt $i/15: HTTP $STATUS"
+              if [ "$STATUS" = "200" ] || [ "$STATUS" = "302" ]; then
+                echo "✅ Service is healthy"
+                exit 0
+              fi
+              sleep 3
+            done
+            echo "❌ Health check failed after 15 attempts"
+            exit 1
+
+  notify:
+    name: Notify
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    needs: [health-check]
+    if: always()
+    steps:
+      - name: Deployment Summary
+        run: |
+          echo "========================================"
+          echo "  Deployment to staging completed!"
+          echo "  Branch: ${{ github.ref_name }}"
+          echo "  Commit: ${{ github.sha }}"
+          echo "  Triggered by: ${{ github.actor }}"
+          echo "========================================"

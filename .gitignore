@@ -1,0 +1,56 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+build/
+
+# Logs
+logs/
+logger/
+docs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.scannerwork/
+*~
+
+# Testing
+coverage/
+.nyc_output/
+test-report/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Prisma
+src/generated/
+*.db
+*.db-journal
+
+# AI / Agent files (local only)
+AGENTS.md
+migration-report.md
+.commandcode/taste/taste.md
+
+# Taste
