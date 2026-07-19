@@ -1,0 +1,98 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model role {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  status    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users            user[]
+  rolePermissions  rolePermission[]
+}
+
+model module {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  resources resource[]
+}
+
+model resource {
+  id               String   @id @default(uuid())
+  name             String
+  moduleId         String 
+  module           module   @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  availableActions String[] 
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  rolePermissions  rolePermission[]
+}
+
+model rolePermission {
+  id             String   @id @default(uuid())
+  roleId         String
+  role           role     @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  resourceId     String
+  resource       resource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+  grantedActions String[] 
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([roleId, resourceId])
+}
+
+model logs {
+  id        Int      @id @default(autoincrement())
+  date      String?
+  name      String?
+  role      String?
+  host      String?
+  status    String?
+  data      Json?
+  userId    String?
+  ip        String?
+  method    String?
+  dayCount  Int?
+  createdAt DateTime @default(now())
+
+  @@index([date])
+  @@index([userId])
+}
+
+model user {
+  id        String   @id @default(uuid())
+  roleId    String
+  role      role     @relation(fields: [roleId], references: [id])
+  email     String   @unique
+  password  String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  profile       profile?
+}
+
+model profile {
+  id        String   @id @default(uuid())
+  name      String?
+  phone     String?
+  address   String?
+  photo     String?
+  NIK       String?
+  userId    String   @unique
+  user      user     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+

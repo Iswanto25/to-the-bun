@@ -1,0 +1,24 @@
+{
+	"compilerOptions": {
+		"outDir": "./dist",
+		"rootDir": "./",
+		"baseUrl": ".",
+		"paths": {
+			"@/*": ["src/*"]
+		},
+		"module": "ESNext",
+		"moduleResolution": "bundler",
+		"target": "ESNext",
+		"esModuleInterop": true,
+		"resolveJsonModule": true,
+		"strict": true,
+		"noUnusedLocals": true,
+		"noUnusedParameters": true,
+		"skipLibCheck": true,
+		"forceConsistentCasingInFileNames": true,
+		"allowJs": false,
+		"typeRoots": ["./node_modules/@types", "./types"]
+	},
+	"include": ["src/**/*.ts", "__tests__/**/*.ts", "prisma.config.ts", "types/**/*.d.ts"],
+	"exclude": ["node_modules", "dist"]
+}
