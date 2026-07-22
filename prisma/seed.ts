@@ -1,142 +1,127 @@
 import prisma from "../src/configs/database.js";
-import { encryptPassword } from "../src/utils/utils.js";
+
+const IS_SEED_ENABLED = true;
 
 async function main() {
-	console.info("🌱 Memulai proses seeding database...");
+	if (!IS_SEED_ENABLED) {
+		console.info("🌱 [SEED] Seeding dilewati (IS_SEED_ENABLED = false).");
+		return;
+	}
 
-	// 1. Bersihkan data lama (opsional, agar tidak duplikat saat di-run berkali-kali)
-	console.info("Menghapus data lama...");
-	await prisma.rolePermission.deleteMany();
-	await prisma.resource.deleteMany();
-	await prisma.module.deleteMany();
-	await prisma.profile.deleteMany();
-	await prisma.user.deleteMany();
-	await prisma.role.deleteMany();
+	console.info("🌱 [SEED] Memulai proses database seeding (konsep upsert)...");
 
-	// 2. Buat Role
-	console.info("Membuat Roles...");
-	const superadminRole = await prisma.role.create({
-		data: {
+	const roles = [
+		{
+			id: "a1b2c3d4-e5f6-4a7b-8c9d-0123456789ab",
 			name: "Superadmin",
 			status: true,
 		},
-	});
-
-	const userRole = await prisma.role.create({
-		data: {
-			name: "User",
+		{
+			id: "f47ac10b-58cc-4372-a567-0e02b2c3d4e5",
+			name: "USER",
 			status: true,
 		},
-	});
+	];
 
-	// 3. Buat Module
-	console.info("Membuat Modules...");
-	const authModule = await prisma.module.create({
-		data: { name: "Authentication" },
-	});
+	for (const role of roles) {
+		await prisma.role.upsert({
+			where: { id: role.id },
+			update: { name: role.name, status: role.status },
+			create: role,
+		});
+	}
+	console.info(`✅ [SEED] ${roles.length} roles berhasil di-upsert.`);
 
-	const usersModule = await prisma.module.create({
-		data: { name: "Users Management" },
-	});
-
-	// 4. Buat Resource
-	console.info("Membuat Resources...");
-	const profileResource = await prisma.resource.create({
-		data: {
-			name: "Profile",
-			moduleId: authModule.id,
-			availableActions: ["LIST", "DETAIL", "UPDATE", "DELETE"],
+	const modules = [
+		{
+			id: "11111111-2222-4333-8444-555555555555",
+			name: "Authentication",
 		},
-	});
-
-	const usersResource = await prisma.resource.create({
-		data: {
-			name: "Users",
-			moduleId: usersModule.id,
-			availableActions: ["LIST", "DETAIL", "CREATE", "UPDATE", "DELETE"],
+		{
+			id: "66666666-7777-4888-8999-000000000000",
+			name: "User Management",
 		},
-	});
+	];
 
-	// 5. Buat Role Permissions
-	console.info("Membuat Role Permissions...");
-	// Superadmin mendapat semua akses
-	await prisma.rolePermission.createMany({
-		data: [
-			{
-				roleId: superadminRole.id,
-				resourceId: profileResource.id,
-				grantedActions: ["LIST", "DETAIL", "UPDATE", "DELETE"],
+	for (const mod of modules) {
+		await prisma.module.upsert({
+			where: { id: mod.id },
+			update: { name: mod.name },
+			create: mod,
+		});
+	}
+	console.info(`✅ [SEED] ${modules.length} modules berhasil di-upsert.`);
+
+	const resources = [
+		{
+			id: "77777777-8888-4999-8000-111111111111",
+			name: "Auth",
+			moduleId: modules[0].id,
+			availableActions: ["LIST", "CREATE", "UPDATE", "DELETE", "DETAIL"],
+		},
+		{
+			id: "22222222-3333-4444-8555-666666666666",
+			name: "User",
+			moduleId: modules[1].id,
+			availableActions: ["LIST", "CREATE", "UPDATE", "DELETE", "DETAIL"],
+		},
+	];
+
+	for (const resource of resources) {
+		await prisma.resource.upsert({
+			where: { id: resource.id },
+			update: {
+				name: resource.name,
+				moduleId: resource.moduleId,
+				availableActions: resource.availableActions,
 			},
-			{
-				roleId: superadminRole.id,
-				resourceId: usersResource.id,
-				grantedActions: ["LIST", "DETAIL", "CREATE", "UPDATE", "DELETE"],
-			},
-		],
-	});
+			create: resource,
+		});
+	}
+	console.info(`✅ [SEED] ${resources.length} resources berhasil di-upsert.`);
 
-	// User biasa mendapat akses terbatas
-	await prisma.rolePermission.create({
-		data: {
-			roleId: userRole.id,
-			resourceId: profileResource.id,
-			grantedActions: ["DETAIL", "UPDATE"], // Hanya bisa lihat dan update profilnya sendiri
+	const rolePermissions = [
+		{
+			id: "33333333-4444-4555-8666-777777777777",
+			roleId: roles[0].id,
+			resourceId: resources[0].id,
+			grantedActions: ["LIST", "CREATE", "UPDATE", "DELETE", "DETAIL"],
 		},
-	});
+		{
+			id: "44444444-5555-4666-8777-888888888888",
+			roleId: roles[0].id,
+			resourceId: resources[1].id,
+			grantedActions: ["LIST", "CREATE", "UPDATE", "DELETE", "DETAIL"],
+		},
+		{
+			id: "55555555-6666-4777-8888-999999999999",
+			roleId: roles[1].id,
+			resourceId: resources[1].id,
+			grantedActions: ["LIST", "DETAIL"],
+		},
+	];
 
-	// 6. Buat Users & Profiles
-	console.info("Membuat Users...");
-	const adminPassword = await encryptPassword("Admin123!");
-	const adminUser = await prisma.user.create({
-		data: {
-			email: "admin@example.com",
-			password: adminPassword,
-			roleId: superadminRole.id,
-			isActive: true,
-			profile: {
-				create: {
-					name: "Super Admin",
-					phone: "081234567890",
-					address: "Jl. Admin Utama No.1",
-					NIK: "1234567890123456",
+	for (const perm of rolePermissions) {
+		await prisma.rolePermission.upsert({
+			where: {
+				roleId_resourceId: {
+					roleId: perm.roleId,
+					resourceId: perm.resourceId,
 				},
 			},
-		},
-	});
-
-	const normalPassword = await encryptPassword("User123!");
-	const normalUser = await prisma.user.create({
-		data: {
-			email: "user@example.com",
-			password: normalPassword,
-			roleId: userRole.id,
-			isActive: true,
-			profile: {
-				create: {
-					name: "Budi Santoso",
-					phone: "089876543210",
-					address: "Jl. User Biasa No.2",
-					NIK: "6543210987654321",
-				},
+			update: {
+				grantedActions: perm.grantedActions,
 			},
-		},
-	});
-
-	console.info("✅ Seeding selesai!");
-	console.info("-----------------------------------------");
-	console.info("Akun Superadmin:");
-	console.info(`Email    : ${adminUser.email}`);
-	console.info(`Password : Admin123!`);
-	console.info("-----------------------------------------");
-	console.info("Akun User:");
-	console.info(`Email    : ${normalUser.email}`);
-	console.info(`Password : User123!`);
-	console.info("-----------------------------------------");
+			create: perm,
+		});
+	}
+	console.info(`✅ [SEED] ${rolePermissions.length} rolePermissions berhasil di-upsert.`);
+	console.info("🎉 [SEED] Seeding selesai dengan sukses!");
 }
 
 main()
 	.catch((e) => {
-		console.error("❌ Error saat seeding:", e);
+		console.error("❌ [SEED] Terjadi kesalahan saat seeding:", e);
 		process.exit(1);
 	})
 	.finally(async () => {

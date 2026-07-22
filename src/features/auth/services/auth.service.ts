@@ -1,16 +1,17 @@
+import crypto from "node:crypto";
+import fs from "node:fs";
 import { authRepository } from "@/features/auth/repositories/auth.repository.js";
-import { deleteFile, getPublicUrl } from "@/utils/s3.js";
+import { deleteFile, getPublicUrl, getPresignedUploadUrl } from "@/utils/s3.js";
 import { apiError } from "@/utils/respons.js";
 import { authQueue } from "@/features/auth/jobs/auth.jobs.js";
 import { jwtUtils } from "@/utils/jwt.js";
 import { storeToken, deleteToken, getStoredToken } from "@/utils/tokenStore.js";
-import { sendEmail } from "@/utils/smtp.js";
-import { generateOTP, encryptPassword, comparePassword, isEmailValid } from "@/utils/utils.js";
-import { generateOTPEmail } from "@/utils/mail.js";
+import { redisState } from "@/configs/redis.js";
+import { encryptPassword, comparePassword, isEmailValid } from "@/utils/utils.js";
 import { encryptionUtils, decryptSensitive } from "@/utils/encryption.js";
 import { paginate } from "@/utils/pagination.js";
 import { logger } from "@/utils/logger.js";
-import { RegisterInput, UpdateProfileInput } from "@/features/auth/types/auth.types.js";
+import { RegisterInput, UpdateProfileInput, ResetPasswordInput, SendOtpInput, VerifyOtpInput } from "@/features/auth/types/auth.types.js";
 
 const folder = "profile";
 
@@ -26,7 +27,7 @@ export const authServices = {
 
 			const ciphertext = data.NIK ? encryptionUtils.encryptSensitive(data.NIK).ciphertext : null;
 
-			const defaultRole = await tx.role.findUnique({ where: { name: "User" } });
+			const defaultRole = await tx.role.findUnique({ where: { name: "USER" } });
 			if (!defaultRole) throw new apiError(500, "Default role 'USER' not found");
 
 			const user = await authRepository.createUser(
@@ -58,7 +59,6 @@ export const authServices = {
 					id: user.id,
 					name: data.name || null,
 					email: user.email,
-					photo: null,
 				},
 				accessToken,
 				refreshToken,
@@ -115,7 +115,7 @@ export const authServices = {
 		if (!user) throw new apiError(400, "User not found");
 
 		const tokenRecord = await getStoredToken(user.id, "refresh");
-		if (!tokenRecord) throw new apiError(400, "Invalid token");
+		if (!tokenRecord || tokenRecord !== oldToken) throw new apiError(400, "Invalid token");
 
 		await Promise.all([deleteToken(user.id, "access"), deleteToken(user.id, "refresh")]);
 
@@ -153,28 +153,78 @@ export const authServices = {
 		};
 	},
 
+	async sendOtp(input: SendOtpInput): Promise<void> {
+		const user = await authRepository.findUserByEmail(input.email);
+		if (!user) throw new apiError(400, "User not found");
+
+		const otp = crypto.randomInt(100000, 999999).toString();
+
+		const OTP_EXPIRE_SECONDS = 300;
+		await storeToken(user.id, otp, "otp", OTP_EXPIRE_SECONDS);
+
+		await authQueue.add("send-otp-email", {
+			email: input.email,
+			userName: user.profile?.name || "User",
+			otp,
+			purpose: input.type,
+		});
+	},
+
+	async verifyOtp(input: VerifyOtpInput): Promise<void> {
+		const user = await authRepository.findUserByEmail(input.email);
+		if (!user) throw new apiError(400, "User not found");
+
+		const storedOtp = await getStoredToken(user.id, "otp");
+		if (!storedOtp) throw new apiError(400, "OTP tidak valid atau sudah kedaluwarsa");
+
+		if (storedOtp !== input.otp) throw new apiError(400, "OTP tidak valid");
+
+		await deleteToken(user.id, "otp");
+	},
+
 	async forgotPassword(email: string): Promise<void> {
 		const user = await authRepository.findUserByEmail(email);
 		if (!user) throw new apiError(400, "User not found");
 
-		const otp = generateOTP();
+		const token = crypto.randomBytes(32).toString("hex");
 		const userName = user.profile?.name || "User";
-		const html = generateOTPEmail(userName, otp);
 
-		await sendEmail({
-			to: email,
-			subject: "Reset Password",
-			html,
-			fromName: process.env.APP_NAME,
-			fromEmail: process.env.SMTP_USER,
+		if (redisState.isAvailable && redisState.client) {
+			await redisState.client.set(`reset_token:${token}`, user.id, "EX", 900);
+		} else {
+			logger.warn("Redis not available - cannot store reset token");
+			throw new apiError(503, "Service temporarily unavailable");
+		}
+
+		const frontendUrl = process.env.FRONTEND_URL || process.env.BASE_URL || "http://localhost:3000";
+		const resetLink = `${frontendUrl}/reset-password?token=${token}`;
+
+		await authQueue.add("send-forgot-password-email", {
+			email,
+			userName,
+			resetLink,
 		});
+	},
+
+	async resetPassword(input: ResetPasswordInput): Promise<void> {
+		if (!redisState.isAvailable || !redisState.client) {
+			logger.warn("Redis not available - cannot verify reset token");
+			throw new apiError(500, "Terjadi kesalahan pada server");
+		}
+
+		const userId = await redisState.client.get(`reset_token:${input.token}`);
+		if (!userId) throw new apiError(400, "Token tidak valid atau sudah kedaluwarsa");
+
+		const hashedPassword = await encryptPassword(input.password);
+
+		await authRepository.updateUserPassword(userId, hashedPassword);
+
+		await redisState.client.del(`reset_token:${input.token}`);
 	},
 
 	async updateProfile(userId: string, data: UpdateProfileInput): Promise<void> {
 		const currentUser = await authRepository.findUserById(userId);
 		if (!currentUser) throw new apiError(400, "User not found");
-
-		const oldPhotoFileName = currentUser.profile?.photo ?? undefined;
 
 		await authRepository.transaction(async (tx: any) => {
 			let encryptNik: string | undefined = undefined;
@@ -199,17 +249,47 @@ export const authServices = {
 
 			await authRepository.updateUserProfile(userId, profileData, newEmail, tx);
 		});
+	},
 
-		if (data.photo) {
-			await authQueue.add("upload-profile-photo", {
-				base64Data: data.photo,
-				folder,
-				maxSizeMB: 5,
-				allowedFormats: ["image/jpeg", "image/png", "image/jpg", "image/webp"],
-				userId,
-				oldPhotoFileName,
-			});
-		}
+	async updatePhoto(userId: string, file: Express.Multer.File): Promise<void> {
+		const currentUser = await authRepository.findUserById(userId);
+		if (!currentUser) throw new apiError(400, "User not found");
+
+		const oldPhotoFileName = currentUser.profile?.photo || undefined;
+
+		const fileBuffer = await fs.promises.readFile(file.path);
+		const base64Data = `data:${file.mimetype};base64,${fileBuffer.toString("base64")}`;
+
+		await authQueue.add("upload-profile-photo", {
+			base64Data,
+			folder,
+			maxSizeMB: 5,
+			allowedFormats: ["image/jpeg", "image/png", "image/jpg", "image/webp"],
+			userId,
+			oldPhotoFileName,
+		});
+
+		await fs.promises.unlink(file.path).catch((err) => {
+			logger.warn({ err, path: file.path }, "Failed to delete temp file after queuing");
+		});
+	},
+
+	async updatePhotoDirect(userId: string, contentType?: string): Promise<{ presignedUrl: string; fileName: string; publicUrl: string }> {
+		const currentUser = await authRepository.findUserById(userId);
+		if (!currentUser) throw new apiError(400, "User not found");
+
+		const ext = contentType ? contentType.split("/")[1] || "jpg" : "jpg";
+		const { url, key, publicUrl } = await getPresignedUploadUrl(folder, {
+			contentType: contentType || "image/jpeg",
+			fileExtension: ext,
+			expiresIn: 3600,
+		});
+
+		const fileName = key.replace(`${folder}/`, "");
+
+		await authRepository.updateUserProfile(userId, { photo: fileName });
+
+		return { presignedUrl: url, fileName, publicUrl };
 	},
 
 	async deleteProfile(userId: string): Promise<void> {
@@ -258,6 +338,6 @@ export const authServices = {
 			};
 		});
 
-		return { users: result, pagination };
+		return { items: result, pagination };
 	},
 };

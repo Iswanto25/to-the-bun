@@ -5,22 +5,24 @@ import helmet from "helmet";
 import { respons, HttpStatus } from "@/utils/respons.js";
 import apiRoutes from "@/routes/index.js";
 import { errorHandler, notFoundHandler } from "@/middlewares/errorHandler.js";
+import { requestContext } from "@/middlewares/requestContext.js";
 
 export const app = express();
 
 interface DecodedToken {
 	id: string;
 	email: string;
-	roleId?: string;
-	permissions?: any;
-	profile?: any;
-	roles?: any;
+	roleId: string;
+	roleName: string;
+	profile: { name: string | null; phone: string | null; address: string | null; photo: string | null; NIK: string | null } | null;
 }
 
 declare module "express-serve-static-core" {
 	interface Request {
 		user?: DecodedToken;
 		startTime?: number;
+		reqId: string;
+		rawBody?: unknown;
 	}
 }
 
@@ -69,7 +71,7 @@ app.use((_req, res, next) => {
 	next();
 });
 
-const allowedOrigins = Bun.env.ALLOWED_ORIGINS ? Bun.env.ALLOWED_ORIGINS.split(",").map((origin) => origin.trim()) : "*";
+const allowedOrigins = process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(",").map((origin) => origin.trim()) : "*";
 
 const corsOptions: CorsOptions = {
 	origin: allowedOrigins === "*" ? "*" : allowedOrigins,
@@ -86,20 +88,15 @@ app.use(compression());
 app.use(express.json({ limit: "100mb" }));
 app.use(express.urlencoded({ extended: true, limit: "100mb" }));
 
-app.use((req, _res, next) => {
-	req.startTime = Date.now();
-	next();
-});
-
-
+app.use(requestContext);
 
 app.get("/", (_req, res) => res.redirect("/health"));
 app.get("/health", (req, res) => {
 	const data = {
 		status: "ok",
 		timestamp: new Date().toLocaleString("sv-SE", { timeZone: "Asia/Jakarta" }),
-		version: Bun.env.VERSION || "2.3.0",
-		environment: Bun.env.NODE_ENV || "development",
+		version: process.env.VERSION || "1.0.0",
+		environment: process.env.NODE_ENV || "development",
 	};
 	return respons.success("Service is healthy", data, HttpStatus.OK, res, req);
 });

@@ -1,9 +1,7 @@
 import { Response, Request } from "express";
-import prisma from "@/configs/database.js";
-import { jwtUtils } from "@/utils/jwt.js";
-import { getStoredToken } from "@/utils/tokenStore.js";
-import { logger } from "@/utils/logger.js";
-import { formatDateTime } from "@/utils/utils.js";
+import { logger, formatIsoWithTz } from "@/utils/logger.js";
+import { saveAuditLog } from "@/utils/auditLogger.js";
+import { maskSensitive, truncateLongStrings } from "@/middlewares/requestContext.js";
 
 export enum HttpStatus {
 	OK = 200,
@@ -22,126 +20,146 @@ export enum HttpStatus {
 	INTERNAL_SERVER_ERROR = 500,
 }
 
-const getRequestContext = async (req?: Request) => {
-	if (!req) return { user: null, ip: "", host: "", userAgent: "", ua: { source: "Unknown" }, dateTimeNow: "" };
-	const auth = req.headers?.authorization;
+interface LogUser {
+	id?: string;
+	name: string;
+	role: string | null;
+}
 
-	let user = null;
-	let userId: string | null = null;
-	const token = auth?.startsWith("Bearer ") ? auth.split(" ")[1] : null;
+function getLogUser(req?: Request): LogUser {
+	if (!req?.user) return { name: "Guest", role: null };
 
-	if (token) {
-		try {
-			const decoded = jwtUtils.verifyAccessToken(token);
-			const storedToken = await getStoredToken(decoded.id, "access");
-			if (storedToken === token) {
-				userId = decoded.id;
-				user = await prisma.user.findUnique({ where: { id: userId as string }, include: { profile: true, role: true } });
-			}
-		} catch {
-			// Ignore token errors for logging purposes
-		}
+	return {
+		id: req.user.id,
+		name: req.user.profile?.name || "Unknown",
+		role: req.user.roleName || null,
+	};
+}
+
+function getClientIp(req: Request): string {
+	const forwarded = req.headers["x-forwarded-for"];
+	return forwarded?.toString().split(",")[0].trim() || req.socket?.remoteAddress || "unknown";
+}
+
+function buildLogRequest(req?: Request): Record<string, unknown> {
+	if (!req) return {};
+	const hasQuery = req.query && Object.keys(req.query).length > 0;
+	return {
+		...(req.rawBody as Record<string, unknown> | undefined),
+		...(hasQuery ? { query: req.query } : {}),
+	};
+}
+
+function buildLogResponse(payload: unknown, resTime: string, fallbackKey: "data" | "error" = "data"): Record<string, any> {
+	const processed = truncateLongStrings(maskSensitive(payload));
+	if (processed === null || processed === undefined) {
+		return { resTime };
 	}
-
-	const forwardedForHeader = req.headers["x-forwarded-for"];
-	const ip = forwardedForHeader?.toString().split(",")[0].trim() || req.socket?.remoteAddress || "unknown";
-	const host = `${req.protocol}://${req.get("host")}${req.originalUrl}`;
-	const userAgent = req.headers["user-agent"] || "Unknown";
-	const dateTimeNow = formatDateTime();
-
-	return { user, ip, host, userAgent, dateTimeNow };
-};
+	if (typeof processed === "object" && !Array.isArray(processed)) {
+		return { ...(processed as Record<string, any>), resTime };
+	}
+	return { [fallbackKey]: processed, resTime };
+}
 
 export const respons = {
-	async success(message: string, data: unknown, code: number, res: Response, req: Request, pagination?: any) {
-		const { user, ip, host, userAgent, dateTimeNow } = await getRequestContext(req);
-
-		// Calculate response time
+	success(message: string, data: unknown, code: number, res: Response, req: Request, pagination?: any) {
+		const logUser = getLogUser(req);
+		const ip = getClientIp(req);
 		const startTime = req.startTime || Date.now();
-		const responseTime = Date.now() - startTime;
+		const now = Date.now();
+		const responseTime = now - startTime;
+		const path = req.path || req.originalUrl;
+		const isoNow = formatIsoWithTz(new Date(now));
+
+		const reqBody = truncateLongStrings(maskSensitive(buildLogRequest(req))) as Record<string, unknown>;
 
 		const logPayload = {
-			userId: user?.id,
-			name: (user as any)?.profile?.name || "Unknown",
-			role: (user as any)?.role?.name || null,
-			ip: ip,
-			date: dateTimeNow,
-			host,
-			status: code.toString(),
-			method: req?.method,
-			data: {
-				userAgent,
-				timestamp: dateTimeNow,
-				source: "Success",
-				message,
-				data: data as any,
-			},
+			level: "INFO",
+			time: isoNow,
+			path,
+			method: req.method,
+			status: code,
+			reqId: req.reqId,
+			userId: logUser.id || null,
+			userRole: logUser.role || "GUEST",
+			request: { ...reqBody, reqTime: formatIsoWithTz(new Date(startTime)) },
+			response: buildLogResponse(data, isoNow, "data"),
+			userAgent: req.headers["user-agent"] || "Unknown",
+			durationMs: responseTime,
+			msg: "HTTP Transaction completed",
 		};
 
-		// Simplified console log with response time
-		const path = req.path || req.originalUrl;
-		const userName = (user as any)?.profile?.name || "Guest";
-		logger.info(`${req.method} ${path} ${code} | ${userName} | ${responseTime}ms`);
+		logger.info(logPayload);
 
-		try {
-			await prisma.logs.create({
-				data: logPayload,
-			});
-		} catch (dbError) {
-			logger.warn({ dbError }, "Failed to write success log to database");
-		}
+		saveAuditLog({
+			userId: logUser.id || null,
+			name: logUser.name,
+			role: logUser.role,
+			ip,
+			host: `${req.protocol}://${req.get("host")}${req.originalUrl}`,
+			status: code.toString(),
+			method: req.method,
+			reqId: req.reqId,
+			data: logPayload,
+			date: new Date(now),
+		});
 
 		res.status(code).json({
 			success: true,
 			message,
-			data: data,
+			data,
 			...(pagination && { pagination }),
 		});
 	},
 
-	async error(message: string, error: unknown, code: number, res: Response, req?: Request) {
-		const { user, ip, host, userAgent, dateTimeNow } = await getRequestContext(req);
-
-		// Calculate response time
+	error(message: string, error: unknown, code: number, res: Response, req?: Request) {
+		const logUser = getLogUser(req);
+		const ip = req ? getClientIp(req) : "";
 		const startTime = req?.startTime || Date.now();
-		const responseTime = Date.now() - startTime;
+		const now = Date.now();
+		const responseTime = now - startTime;
+		const path = req?.path || req?.originalUrl || "unknown";
+		const isoNow = formatIsoWithTz(new Date(now));
+		const hint = (error as any)?.hint || (error as any)?.code || undefined;
+
+		const reqBody = truncateLongStrings(maskSensitive(buildLogRequest(req))) as Record<string, unknown>;
 
 		const logPayload = {
-			userId: user?.id,
-			name: (user as any)?.profile?.name || "Unknown",
-			role: (user as any)?.role?.name || null,
-			ip: ip,
-			date: dateTimeNow,
-			host,
-			status: code.toString(),
-			method: req?.method,
-			data: {
-				userAgent,
-				timestamp: dateTimeNow,
-				source: "Error",
-				message,
-				hint: (error as any)?.hint || (error as any)?.code || undefined,
-				error: error as any,
-			},
+			level: "ERROR",
+			time: isoNow,
+			path,
+			method: req?.method || "UNKNOWN",
+			status: code,
+			reqId: req?.reqId,
+			userId: logUser.id || null,
+			userRole: logUser.role || "GUEST",
+			request: { ...reqBody, reqTime: formatIsoWithTz(new Date(startTime)) },
+			response: buildLogResponse(error, isoNow, "error"),
+			userAgent: req?.headers["user-agent"] || "Unknown",
+			durationMs: responseTime,
+			...(hint ? { hint } : {}),
+			msg: "HTTP Transaction completed",
 		};
 
-		// Simplified console log with response time
-		const path = req?.path || req?.originalUrl || "unknown";
-		const userName = (user as any)?.profile?.name || "Guest";
-		const errorHint = (error as any)?.hint || (error as any)?.code || "";
-		logger.error(`${req?.method} ${path} ${code} | ${message} ${errorHint ? `(${errorHint}) ` : ""}| ${userName} | ${responseTime}ms`);
+		logger.error(logPayload);
 
-		try {
-			await prisma.logs.create({
-				data: logPayload,
-			});
-		} catch (dbError) {
-			logger.warn({ dbError }, "Failed to write error log to database");
-		}
+		saveAuditLog({
+			userId: logUser.id || null,
+			name: logUser.name,
+			role: logUser.role,
+			ip,
+			host: req ? `${req.protocol}://${req.get("host")}${req.originalUrl}` : "",
+			status: code.toString(),
+			method: req?.method || "UNKNOWN",
+			reqId: req?.reqId,
+			data: logPayload,
+			date: new Date(now),
+		});
+
 		res.status(code).json({
 			success: false,
 			message,
-			hint: (error as any)?.hint || (error as any)?.code || undefined,
+			hint,
 			error,
 		});
 	},
@@ -153,9 +171,20 @@ export class apiError extends Error {
 
 	constructor(statusCode: number, message: string, hint?: string) {
 		super(message);
+		this.name = "apiError";
 		this.statusCode = statusCode;
 		this.hint = hint;
-		logger.error(`${message}${hint ? ` (Hint: ${hint})` : ""}`);
-		Error.captureStackTrace(this, this.constructor);
 	}
 }
+
+export const validateOrThrow = <T>(
+	schema: { safeParse(data: unknown): { success: boolean; data?: T; error?: { issues: { message: string }[] } } },
+	data: unknown,
+): T => {
+	const result = schema.safeParse(data);
+	if (!result.success) {
+		const errorMsg = result.error?.issues?.[0]?.message || "Data tidak valid";
+		throw new apiError(HttpStatus.BAD_REQUEST, errorMsg);
+	}
+	return result.data as T;
+};

@@ -3,6 +3,7 @@
 Boilerplate production-ready untuk membangun REST API menggunakan Express.js, TypeScript, dan Prisma, dioptimalkan sepenuhnya untuk **Bun**. Arsitektur proyek ini dirancang agar modular, scalable, dan mendukung sistem otorisasi yang kompleks.
 
 > **Dibangun dengan AI Agent:**
+>
 > - [Command Code](https://commandcode.ai/) + DeepSeek V4 Pro
 > - [Gemini CLI](https://github.com/google-gemini/gemini-cli) + Gemini Pro 3.5
 > - [GPT Codex](https://openai.com/index/introducing-codex/) + GPT-5 Pro
@@ -248,20 +249,20 @@ Aplikasi dirancang untuk tetap berjalan meskipun layanan pendukung (Redis, S3, S
 
 ## 📜 Available Scripts
 
-| Script                     | Description                                |
-| -------------------------- | ------------------------------------------ |
-| `bun run dev`              | Start development server dengan hot-reload |
-| `bun run worker:dev`       | Start worker dengan hot-reload             |
+| Script                     | Description                                     |
+| -------------------------- | ----------------------------------------------- |
+| `bun run dev`              | Start development server dengan hot-reload      |
+| `bun run worker:dev`       | Start worker dengan hot-reload                  |
 | `bun run build`            | Compile TypeScript ke JavaScript (app + worker) |
-| `bun run start`            | Run production server                      |
-| `bun run worker:start`     | Run production worker                      |
-| `bun run start:migrate`    | Run migrations dan start server            |
-| `bun test`                 | Run test suite                             |
-| `bun run lint`             | Check linting errors                       |
-| `bun run lint:fix`         | Fix linting errors                         |
-| `bun run prettier`         | Format code dengan Prettier                |
-| `bun run generate-api-key` | Generate API key dengan signature          |
-| `bun run generate-data`    | Generate dummy data (Users, Roles, etc)    |
+| `bun run start`            | Run production server                           |
+| `bun run worker:start`     | Run production worker                           |
+| `bun run start:migrate`    | Run migrations dan start server                 |
+| `bun test`                 | Run test suite                                  |
+| `bun run lint`             | Check linting errors                            |
+| `bun run lint:fix`         | Fix linting errors                              |
+| `bun run prettier`         | Format code dengan Prettier                     |
+| `bun run generate-api-key` | Generate API key dengan signature               |
+| `bun run generate-data`    | Generate dummy data (Users, Roles, etc)         |
 
 ## 🚀 CI/CD
 
@@ -282,6 +283,7 @@ Push ke branch `staging` akan otomatis memicu pipeline 7 jobs:
 Workflow: `.github/workflows/deploy-staging.yml`
 
 Secrets yang diperlukan:
+
 - `SSH_HOST_STAGING`, `SSH_USER_STAGING`, `SSH_KEY_STAGING`, `SSH_PASSWORD_STAGING`, `SSH_PASSPHRASE_STAGING`, `SSH_PORT_STAGING`
 - `ENV_STAGING` — isi environment variables untuk staging
 

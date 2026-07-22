@@ -67,7 +67,7 @@ const createReqRes = (token: string = "token-123") => {
 
 test("respons.success logs and responds with payload", async () => {
 	const { req, res } = createReqRes("valid-token");
-	
+
 	jwtUtilsMock.verifyAccessToken.mockReturnValue({ id: "user-1" });
 	getStoredTokenMock.mockResolvedValue("valid-token");
 	prismaMock.user.findUnique.mockResolvedValue({ id: "user-1", profile: { name: "Tester" }, role: { name: "admin" } });
@@ -84,7 +84,7 @@ test("respons.success logs and responds with payload", async () => {
 
 test("respons.error logs warning when database write fails", async () => {
 	const { req, res } = createReqRes();
-	
+
 	jwtUtilsMock.verifyAccessToken.mockReturnValue({ id: "user-1" });
 	getStoredTokenMock.mockResolvedValue("token-123");
 	prismaMock.user.findUnique.mockResolvedValue({ id: "user-1", profile: { name: "Tester" } });
