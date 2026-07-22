@@ -84,7 +84,7 @@ describe("RBAC Middleware - requirePermission", () => {
 	});
 
 	it("should return forbidden when user has no roleId", async () => {
-		const req = createMockRequest({ user: { id: "user-1", email: "test@test.com" } });
+		const req = createMockRequest({ user: { id: "user-1", email: "test@test.com", roleId: "", roleName: "", profile: null } });
 		const res = createMockResponse();
 		const next = mock(() => {});
 

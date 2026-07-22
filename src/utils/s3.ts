@@ -77,6 +77,39 @@ export function getPublicUrl(folder: string, file: string): string {
 	return `${publicBaseUrl}/${bucket}/${folder}/${file}`;
 }
 
+export async function getPresignedUploadUrl(
+	folder: string,
+	opts: {
+		contentType?: string;
+		fileExtension?: string;
+		expiresIn?: number;
+		maxSize?: number;
+	} = {},
+): Promise<{ url: string; key: string; publicUrl: string; fields?: Record<string, string> }> {
+	if (!s3Holder.client) throwS3NotConfigured();
+	const s3 = s3Holder.client;
+
+	const ext =
+		opts.fileExtension ?
+			opts.fileExtension.startsWith(".") ?
+				opts.fileExtension
+			:	`.${opts.fileExtension}`
+		:	"";
+	const fileName = `${randomString()}${ext}`;
+	const key = `${folder}/${fileName}`;
+	const expiresIn = opts.expiresIn ?? 3600;
+
+	const command = new PutObjectCommand({
+		Bucket: BUCKET,
+		Key: key,
+		...(opts.contentType ? { ContentType: opts.contentType } : {}),
+	});
+
+	const url = await getSignedUrl(s3, command, { expiresIn });
+
+	return { url, key, publicUrl: publicUrl(key) };
+}
+
 function throwS3NotConfigured(): never {
 	throw Object.assign(new Error("S3 Storage is not configured"), {
 		name: "S3NotConfiguredError",

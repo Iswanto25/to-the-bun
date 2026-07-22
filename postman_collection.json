@@ -24,13 +24,8 @@
 						},
 						"url": {
 							"raw": "{{baseUrl}}/auth/register",
-							"host": [
-								"{{baseUrl}}"
-							],
-							"path": [
-								"auth",
-								"register"
-							]
+							"host": ["{{baseUrl}}"],
+							"path": ["auth", "register"]
 						}
 					}
 				},
@@ -65,13 +60,8 @@
 						},
 						"url": {
 							"raw": "{{baseUrl}}/auth/login",
-							"host": [
-								"{{baseUrl}}"
-							],
-							"path": [
-								"auth",
-								"login"
-							]
+							"host": ["{{baseUrl}}"],
+							"path": ["auth", "login"]
 						}
 					}
 				},
@@ -92,13 +82,8 @@
 						"header": [],
 						"url": {
 							"raw": "{{baseUrl}}/auth/logout",
-							"host": [
-								"{{baseUrl}}"
-							],
-							"path": [
-								"auth",
-								"logout"
-							]
+							"host": ["{{baseUrl}}"],
+							"path": ["auth", "logout"]
 						}
 					}
 				},
@@ -128,13 +113,8 @@
 						},
 						"url": {
 							"raw": "{{baseUrl}}/auth/refresh-token",
-							"host": [
-								"{{baseUrl}}"
-							],
-							"path": [
-								"auth",
-								"refresh-token"
-							]
+							"host": ["{{baseUrl}}"],
+							"path": ["auth", "refresh-token"]
 						}
 					}
 				},
@@ -155,13 +135,8 @@
 						"header": [],
 						"url": {
 							"raw": "{{baseUrl}}/auth/profile",
-							"host": [
-								"{{baseUrl}}"
-							],
-							"path": [
-								"auth",
-								"profile"
-							]
+							"host": ["{{baseUrl}}"],
+							"path": ["auth", "profile"]
 						}
 					}
 				},
@@ -181,13 +156,8 @@
 						},
 						"url": {
 							"raw": "{{baseUrl}}/auth/forgot-password",
-							"host": [
-								"{{baseUrl}}"
-							],
-							"path": [
-								"auth",
-								"forgot-password"
-							]
+							"host": ["{{baseUrl}}"],
+							"path": ["auth", "forgot-password"]
 						}
 					}
 				},
@@ -208,13 +178,8 @@
 						"header": [],
 						"url": {
 							"raw": "{{baseUrl}}/auth/users?page=1&limit=10&search=john",
-							"host": [
-								"{{baseUrl}}"
-							],
-							"path": [
-								"auth",
-								"users"
-							],
+							"host": ["{{baseUrl}}"],
+							"path": ["auth", "users"],
 							"query": [
 								{
 									"key": "page",
@@ -258,13 +223,8 @@
 						},
 						"url": {
 							"raw": "{{baseUrl}}/auth/profile",
-							"host": [
-								"{{baseUrl}}"
-							],
-							"path": [
-								"auth",
-								"profile"
-							]
+							"host": ["{{baseUrl}}"],
+							"path": ["auth", "profile"]
 						}
 					}
 				},
@@ -285,14 +245,8 @@
 						"header": [],
 						"url": {
 							"raw": "{{baseUrl}}/auth/profile/user-id-here",
-							"host": [
-								"{{baseUrl}}"
-							],
-							"path": [
-								"auth",
-								"profile",
-								"user-id-here"
-							]
+							"host": ["{{baseUrl}}"],
+							"path": ["auth", "profile", "user-id-here"]
 						}
 					}
 				}

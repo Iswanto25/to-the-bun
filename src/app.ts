@@ -20,11 +20,11 @@ if (isProd) {
 }
 
 server.listen(PORT, HOST, () => {
-	const baseUrl = isProd ? Bun.env.BASE_URL || `https://${Bun.env.DOMAIN || "yourdomain.com"}` : `http://${HOST}:${PORT}`;
+	const baseUrl = isProd ? process.env.BASE_URL || `https://${process.env.DOMAIN || "yourdomain.com"}` : `http://${HOST}:${PORT}`;
 
 	console.info("========================================");
 	console.info(`Server is running on Bun ${Bun.version}`);
-	console.info(`Version: ${Bun.env.VERSION || "2.3.0"}`);
+	console.info(`Version: ${process.env.VERSION || "1.0.0"}`);
 	console.info(`Environment: ${NODE_ENV}`);
 	console.info(`URL: ${baseUrl}`);
 	console.info("========================================");

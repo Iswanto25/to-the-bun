@@ -185,6 +185,20 @@ export function generatePasswordChangedEmail(userName: string): string {
 }
 
 /**
+ * Generate reset password email with link
+ */
+export function generateResetPasswordEmail(userName: string, resetLink: string): string {
+	return generateEmailTemplate({
+		userName,
+		title: "Reset Password",
+		mainMessage: "Kami menerima permintaan untuk mengatur ulang kata sandi akun Anda.",
+		additionalInfo: "Klik tombol di bawah ini untuk mereset password Anda:",
+		actionContent: `<a href="${resetLink}" class="button">Reset Password</a>`,
+		warningMessage: "Link ini akan kedaluwarsa dalam waktu <strong>15 menit</strong>. Jika Anda tidak meminta reset password, abaikan email ini.",
+	});
+}
+
+/**
  * Generate generic OTP email (for various purposes)
  */
 export function generateGenericOTPEmail(options: { userName: string; otp: string; purpose: string; expiryMinutes?: number }): string {

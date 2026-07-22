@@ -122,7 +122,7 @@ test("uploadBase64 stores buffer and validates size", async () => {
 
 	const base64 = "data:image/png;base64," + Buffer.from("filedata").toString("base64");
 	const result = await module.uploadBase64("images", base64, 2, ["image/png"]);
-	
+
 	expect(result.url).toBeDefined();
 	expect(savedContentType).toBe("image/png");
 });

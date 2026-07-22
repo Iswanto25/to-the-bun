@@ -20,7 +20,7 @@ server.listen(PORT, HOST, () => {
 
 	console.info("========================================");
 	console.info(`Server is running on Bun ${Bun.version}`);
-	console.info(`Version: ${Bun.env.VERSION || "1.0.0"}`);
+	console.info(`Version: ${process.env.VERSION || "1.0.0"}`);
 	console.info(`Environment: ${NODE_ENV}`);
 	console.info(`URL: ${baseUrl}`);
 	console.info("Worker: Running (BullMQ background jobs)");

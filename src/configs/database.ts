@@ -36,6 +36,4 @@ prisma.$on("warn", (e) => {
 	logger.warn(`Database Warning: ${e.message}`);
 });
 
-
-
 export default prisma;

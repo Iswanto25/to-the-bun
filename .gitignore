@@ -20,6 +20,7 @@ lerna-debug.log*
 .env
 .env.local
 .env.*.local
+.env.test
 
 # OS files
 .DS_Store
@@ -41,6 +42,7 @@ test-report/
 # Temporary files
 tmp/
 temp/
+uploads/
 *.tmp
 
 # Prisma
@@ -51,6 +53,6 @@ src/generated/
 # AI / Agent files (local only)
 AGENTS.md
 migration-report.md
-.commandcode/taste/taste.md
-
-# Taste
+.commandcode/*
+.opencode/
+graphify-out
