@@ -1,5 +1,4 @@
 import crypto from "node:crypto";
-import fs from "node:fs";
 import { authRepository } from "@/features/auth/repositories/auth.repository.js";
 import { deleteFile, getPublicUrl, getPresignedUploadUrl } from "@/utils/s3.js";
 import { apiError } from "@/utils/respons.js";
@@ -257,8 +256,7 @@ export const authServices = {
 
 		const oldPhotoFileName = currentUser.profile?.photo || undefined;
 
-		const fileBuffer = await fs.promises.readFile(file.path);
-		const base64Data = `data:${file.mimetype};base64,${fileBuffer.toString("base64")}`;
+		const base64Data = `data:${file.mimetype};base64,${file.buffer.toString("base64")}`;
 
 		await authQueue.add("upload-profile-photo", {
 			base64Data,
@@ -267,10 +265,6 @@ export const authServices = {
 			allowedFormats: ["image/jpeg", "image/png", "image/jpg", "image/webp"],
 			userId,
 			oldPhotoFileName,
-		});
-
-		await fs.promises.unlink(file.path).catch((err) => {
-			logger.warn({ err, path: file.path }, "Failed to delete temp file after queuing");
 		});
 	},
 

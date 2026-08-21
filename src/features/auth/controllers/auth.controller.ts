@@ -7,7 +7,7 @@ export const authController = {
 	register: async (req: Request, res: Response) => {
 		const data = validateOrThrow(authValidation.register, req.body);
 		const result = await authServices.register(data);
-		return respons.success("Berhasil register", result, HttpStatus.OK, res, req);
+		return respons.success("Berhasil register", result, HttpStatus.CREATED, res, req);
 	},
 
 	login: async (req: Request, res: Response) => {
