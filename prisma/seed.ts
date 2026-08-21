@@ -1,4 +1,5 @@
 import prisma from "../src/configs/database.js";
+import { Action } from "@prisma/client";
 
 const IS_SEED_ENABLED = true;
 
@@ -35,10 +36,12 @@ async function main() {
 	const modules = [
 		{
 			id: "11111111-2222-4333-8444-555555555555",
+			number: 1,
 			name: "Authentication",
 		},
 		{
 			id: "66666666-7777-4888-8999-000000000000",
+			number: 2,
 			name: "User Management",
 		},
 	];
@@ -46,7 +49,7 @@ async function main() {
 	for (const mod of modules) {
 		await prisma.module.upsert({
 			where: { id: mod.id },
-			update: { name: mod.name },
+			update: { name: mod.name, number: mod.number },
 			create: mod,
 		});
 	}
@@ -55,15 +58,17 @@ async function main() {
 	const resources = [
 		{
 			id: "77777777-8888-4999-8000-111111111111",
+			number: 1,
 			name: "Auth",
 			moduleId: modules[0].id,
-			availableActions: ["LIST", "CREATE", "UPDATE", "DELETE", "DETAIL"],
+			availableActions: [Action.LIST, Action.CREATE, Action.UPDATE, Action.DELETE, Action.DETAIL],
 		},
 		{
 			id: "22222222-3333-4444-8555-666666666666",
+			number: 1,
 			name: "User",
 			moduleId: modules[1].id,
-			availableActions: ["LIST", "CREATE", "UPDATE", "DELETE", "DETAIL"],
+			availableActions: [Action.LIST, Action.CREATE, Action.UPDATE, Action.DELETE, Action.DETAIL],
 		},
 	];
 
@@ -72,6 +77,7 @@ async function main() {
 			where: { id: resource.id },
 			update: {
 				name: resource.name,
+				number: resource.number,
 				moduleId: resource.moduleId,
 				availableActions: resource.availableActions,
 			},
@@ -85,19 +91,19 @@ async function main() {
 			id: "33333333-4444-4555-8666-777777777777",
 			roleId: roles[0].id,
 			resourceId: resources[0].id,
-			grantedActions: ["LIST", "CREATE", "UPDATE", "DELETE", "DETAIL"],
+			grantedActions: [Action.LIST, Action.CREATE, Action.UPDATE, Action.DELETE, Action.DETAIL],
 		},
 		{
 			id: "44444444-5555-4666-8777-888888888888",
 			roleId: roles[0].id,
 			resourceId: resources[1].id,
-			grantedActions: ["LIST", "CREATE", "UPDATE", "DELETE", "DETAIL"],
+			grantedActions: [Action.LIST, Action.CREATE, Action.UPDATE, Action.DELETE, Action.DETAIL],
 		},
 		{
 			id: "55555555-6666-4777-8888-999999999999",
 			roleId: roles[1].id,
 			resourceId: resources[1].id,
-			grantedActions: ["LIST", "DETAIL"],
+			grantedActions: [Action.LIST, Action.DETAIL],
 		},
 	];
 
