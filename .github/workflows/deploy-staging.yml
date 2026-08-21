@@ -1,242 +1,286 @@
-name: Deploy staging boilerplate-expressjs
+name: Deploy ScholaFlow BE to Staging
 
 on:
     push:
         branches:
             - staging
 
-env:
-    FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-
 jobs:
-    scm:
-        name: SCM
+    # ============================================================
+    # STAGE 0: Notification (Start)
+    # ============================================================
+    notify-start:
         runs-on: ubuntu-latest
-        timeout-minutes: 2
         steps:
-            - name: Checkout Repository
-              uses: actions/checkout@v6
-            - name: Log SCM Information
-              run: |
-                  echo "Branch : ${{ github.ref_name }}"
-                  echo "Commit : ${{ github.sha }}"
-                  echo "Author : ${{ github.actor }}"
-                  echo "Message: $(git log -1 --pretty=%s)"
+            - name: Send Telegram Notification (Start)
+              uses: appleboy/telegram-action@master
+              with:
+                  to: ${{ secrets.TELEGRAM_TO }}
+                  token: ${{ secrets.TELEGRAM_TOKEN }}
+                  format: markdown
+                  message: |
+                      *STATUS: PIPELINE BERJALAN*
+                      *Repository:* ${{ github.repository }}
+                      *Branch:* ${{ github.ref_name }}
+                      *Pusher:* ${{ github.actor }}
 
-    lint-typecheck:
-        name: Lint & Type Check
+                      [Lihat Pipeline](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
+
+    # ============================================================
+    # STAGE 1+2: Checkout → Dependencies → Code Analysis
+    # ============================================================
+    analyze:
         runs-on: ubuntu-latest
-        timeout-minutes: 10
         steps:
             - name: Checkout Repository
-              uses: actions/checkout@v6
+              uses: actions/checkout@v4
+
             - name: Setup Bun Runtime
               uses: oven-sh/setup-bun@v2
               with:
                   bun-version: latest
-            - name: Install Dependencies
+
+            - name: Install All Dependencies
               run: bun install
+
             - name: Generate Prisma Client
-              run: DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy" bunx prisma generate
-            - name: Run ESLint
+              run: bunx prisma generate
+              env:
+                  DATABASE_URL: postgresql://dummy:dummy@localhost:5432/dummy
+
+            - name: Run Linter
               run: bun run lint
+
             - name: Run Type Check
               run: bun run typecheck
 
-    test:
-        name: Tests (Unit + Integration)
-        runs-on: ubuntu-latest
-        timeout-minutes: 15
-        needs: [lint-typecheck]
-        steps:
-            - name: Checkout Repository
-              uses: actions/checkout@v6
-            - name: Setup Bun Runtime
-              uses: oven-sh/setup-bun@v2
-              with:
-                  bun-version: latest
-            - name: Install Dependencies
-              run: bun install
-            - name: Generate Prisma Client
-              run: DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy" bunx prisma generate
-            - name: Run Unit Tests (Utils)
-              run: |
-                  bun test src/utils/__tests__/encryption.test.ts
-                  bun test src/utils/__tests__/jwt.test.ts
-                  bun test src/utils/__tests__/logger.test.ts
-                  bun test src/utils/__tests__/pagination.test.ts
-                  bun test src/utils/__tests__/utils.test.ts
-            - name: Run Unit Tests (Middlewares)
-              run: |
-                  bun test __tests__/middlewares/errorHandler.middleware.test.ts
-                  bun test __tests__/middlewares/auth.middleware.test.ts
-                  bun test __tests__/middlewares/rbac.middleware.test.ts
-            - name: Run Unit Tests (Auth Services)
-              run: bun test src/features/auth/services/auth.service.spec.ts
-            - name: Run Unit Tests (Auth Controllers)
-              run: bun test src/features/auth/controllers/auth.controller.spec.ts
-            - name: Run Integration Tests
-              run: bun test __tests__/integration/
+            - name: Run Unit Tests
+              run: bun test
 
+    # ============================================================
+    # STAGE 3: Build
+    # ============================================================
     build:
-        name: Build
+        needs: analyze
         runs-on: ubuntu-latest
-        timeout-minutes: 10
-        needs: [test]
         steps:
             - name: Checkout Repository
-              uses: actions/checkout@v6
+              uses: actions/checkout@v4
+
             - name: Setup Bun Runtime
               uses: oven-sh/setup-bun@v2
               with:
                   bun-version: latest
-            - name: Install Dependencies
+
+            - name: Install All Dependencies
               run: bun install
+
             - name: Generate Prisma Client
-              run: DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy" bunx prisma generate
+              run: bunx prisma generate
+              env:
+                  DATABASE_URL: postgresql://dummy:dummy@localhost:5432/dummy
+
             - name: Compile TypeScript to JavaScript
               run: bun run build
+
             - name: Upload Build Artifacts
-              uses: actions/upload-artifact@v7
+              uses: actions/upload-artifact@v4
               with:
-                  name: dist
+                  name: build-artifacts
                   path: |
                       dist/
+                      src/
+                      scripts/
                       prisma/
                       prisma.config.ts
+                      tsconfig.json
                       package.json
-                      ecosystem.config.cjs
                       bun.lock
+                      ecosystem.config.cjs
+                  retention-days: 1
 
-    deploy:
-        name: Deploy to VPS
+    # ============================================================
+    # STAGE 4: Artifact Transfer
+    # ============================================================
+    transfer:
+        needs: build
         runs-on: ubuntu-latest
-        timeout-minutes: 30
-        needs: [build]
         steps:
             - name: Download Build Artifacts
-              uses: actions/download-artifact@v7
+              uses: actions/download-artifact@v4
               with:
-                  name: dist
-            - name: Copy Files to VPS via SCP
-              uses: appleboy/scp-action@v1
+                  name: build-artifacts
+
+            - name: Copy Artifacts to Server via SCP
+              uses: appleboy/scp-action@v0.1.7
               with:
                   host: ${{ secrets.SSH_HOST_STAGING }}
                   username: ${{ secrets.SSH_USER_STAGING }}
-                  key: ${{ secrets.SSH_KEY_STAGING }}
                   password: ${{ secrets.SSH_PASSWORD_STAGING }}
-                  passphrase: ${{ secrets.SSH_PASSPHRASE_STAGING }}
                   port: ${{ secrets.SSH_PORT_STAGING }}
                   timeout: 30m
-                  source: "dist/,prisma/,prisma.config.ts,package.json,ecosystem.config.cjs,bun.lock"
-                  target: "/root/boilerplate-expressjs"
-            - name: Deploy to VPS
-              uses: appleboy/ssh-action@v1
+                  source: "dist/,src/,scripts/,prisma/,prisma.config.ts,tsconfig.json,package.json,bun.lock,ecosystem.config.cjs"
+                  target: "/root/scholaflow-backend-staging"
+
+    # ============================================================
+    # STAGE 5: Pre-Deployment (Server Target)
+    # ============================================================
+    pre-deploy:
+        needs: transfer
+        runs-on: ubuntu-latest
+        steps:
+            - name: Install Dependencies & Run Migrations on Server
+              uses: appleboy/ssh-action@v1.0.3
               with:
                   host: ${{ secrets.SSH_HOST_STAGING }}
                   username: ${{ secrets.SSH_USER_STAGING }}
-                  key: ${{ secrets.SSH_KEY_STAGING }}
                   password: ${{ secrets.SSH_PASSWORD_STAGING }}
-                  passphrase: ${{ secrets.SSH_PASSPHRASE_STAGING }}
                   port: ${{ secrets.SSH_PORT_STAGING }}
                   command_timeout: 30m
                   script: |
-                      export PATH=$PATH:/root/.bun/bin:/usr/local/bin
-                      cd /root/boilerplate-expressjs
+                      set -e
+                      export PATH=$PATH:/usr/local/bin:/root/.bun/bin
+                      cd /root/scholaflow-backend-staging
 
-                      cat << 'ENVEOF' > .env
+                      echo "📝 Writing .env file..."
+                      cat << 'EOF' > .env
                       ${{ secrets.ENV_STAGING }}
-                      ENVEOF
+                      EOF
 
-                      echo "[1/5] Installing deps..."
+                      echo "📦 Installing production dependencies..."
                       bun install --production
 
-                      echo "[2/5] Generating prisma client..."
+                      echo "🗄️ Running database migrations..."
+                      export DATABASE_URL="$(grep '^DATABASE_URL=' .env | cut -d= -f2-)"
+                      # echo "Running reset migration"
+                      # bunx prisma migrate reset --force
+                      # echo "Running generate migration"
                       bunx prisma generate
+                      echo "Running deploy migration"
+                      bunx prisma migrate deploy
 
-                      echo "[3/5] Running migrations..."
-                      bunx prisma migrate deploy || echo "⚠️ Migration skipped"
+                      # echo "Running seed knowledge"
+                      # bunx tsx scripts/seed-knowledge.ts
 
-                      echo "[3.5/5] Running seeder..."
-                      bunx prisma db seed || echo "⚠️ Seeding skipped"
+                      # echo "🌱 Running seeder..."
+                      # bunx prisma db seed
 
-                      echo "[4/5] Starting canary on port 40000..."
-                      pm2 delete boilerplate-backend-new 2>/dev/null || true
-                      PORT=40000 NODE_ENV=staging pm2 start ./dist/app.js \
-                        --name boilerplate-backend-new \
-                        --interpreter bun \
-                        --kill-timeout 5000
+    # ============================================================
+    # STAGE 6: Deployment (Zero Downtime via PM2 Reload)
+    # ============================================================
+    deploy:
+        needs: pre-deploy
+        runs-on: ubuntu-latest
+        steps:
+            - name: Deploy with PM2 Reload (Zero Downtime)
+              uses: appleboy/ssh-action@v1.0.3
+              with:
+                  host: ${{ secrets.SSH_HOST_STAGING }}
+                  username: ${{ secrets.SSH_USER_STAGING }}
+                  password: ${{ secrets.SSH_PASSWORD_STAGING }}
+                  port: ${{ secrets.SSH_PORT_STAGING }}
+                  command_timeout: 30m
+                  script: |
+                      set -e
+                      export PATH=$PATH:/usr/local/bin:/root/.bun/bin
+                      cd /root/scholaflow-backend-staging
 
-                      sleep 5
+                      echo "🚀 Reloading application (Zero Downtime)..."
+                      pm2 reload ecosystem.config.cjs --env staging || pm2 start ecosystem.config.cjs --env staging
+                      pm2 save
+                      echo "✅ PM2 reload completed"
 
-                      echo "[5/5] Health check..."
+    # ============================================================
+    # STAGE 7: Post-Deployment (Health Check & Rollback)
+    # ============================================================
+    health-check:
+        needs: deploy
+        runs-on: ubuntu-latest
+        steps:
+            - name: Health Check & Rollback if Failed
+              uses: appleboy/ssh-action@v1.0.3
+              with:
+                  host: ${{ secrets.SSH_HOST_STAGING }}
+                  username: ${{ secrets.SSH_USER_STAGING }}
+                  password: ${{ secrets.SSH_PASSWORD_STAGING }}
+                  port: ${{ secrets.SSH_PORT_STAGING }}
+                  command_timeout: 5m
+                  script: |
+                      set -e
+                      export PATH=$PATH:/usr/local/bin:/root/.bun/bin
+                      cd /root/scholaflow-backend-staging
+
+                      echo "🔍 Performing health check..."
                       HEALTHY=false
-                      for i in $(seq 1 20); do
-                        STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 http://localhost:40000/health 2>/dev/null || echo "000")
-                        echo "  Attempt $i/20: HTTP $STATUS"
-                        if [ "$STATUS" = "200" ] || [ "$STATUS" = "302" ]; then
+
+                      for i in $(seq 1 15); do
+                        STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:4001/health 2>/dev/null || echo "000")
+                        if [ "$STATUS" = "200" ]; then
+                          echo "✅ Application healthy (HTTP $STATUS)"
                           HEALTHY=true
                           break
                         fi
+                        echo "⏳ Attempt $i/15: HTTP $STATUS, retrying..."
                         sleep 2
                       done
 
                       if [ "$HEALTHY" = "true" ]; then
-                        pm2 delete boilerplate-backend 2>/dev/null || true
-                        pm2 delete boilerplate-backend-new 2>/dev/null || true
-                        pm2 delete boilerplate-worker 2>/dev/null || true
-                        pm2 start ecosystem.config.cjs
-                        pm2 save
-                        echo "✅ Done — app:4004 + worker"
+                        echo "✅ Deployment successful!"
                       else
-                        echo "❌ Canary failed"
-                        pm2 logs boilerplate-backend-new --lines 30 --nostream 2>/dev/null || true
-                        pm2 delete boilerplate-backend-new 2>/dev/null || true
+                        echo "❌ Health check failed! Rolling back..."
+                        pm2 restart scholaflow-backend-staging
+                        echo "⚠️  Application restarted. Check server for details."
                         exit 1
                       fi
 
-    health-check:
-        name: Health Check
-        runs-on: ubuntu-latest
-        timeout-minutes: 5
-        needs: [deploy]
+    # ============================================================
+    # STAGE 8: Notification (Success)
+    # ============================================================
+    notify-success:
+        needs: [analyze, build, transfer, pre-deploy, deploy, health-check]
         if: success()
-        steps:
-            - name: Verify Deployed Service via SSH
-              uses: appleboy/ssh-action@v1
-              with:
-                  host: ${{ secrets.SSH_HOST_STAGING }}
-                  username: ${{ secrets.SSH_USER_STAGING }}
-                  key: ${{ secrets.SSH_KEY_STAGING }}
-                  password: ${{ secrets.SSH_PASSWORD_STAGING }}
-                  passphrase: ${{ secrets.SSH_PASSPHRASE_STAGING }}
-                  port: ${{ secrets.SSH_PORT_STAGING }}
-                  command_timeout: 2m
-                  script: |
-                      for i in $(seq 1 15); do
-                        STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 http://localhost:4004/health 2>/dev/null || echo "000")
-                        echo "Attempt $i/15: HTTP $STATUS"
-                        if [ "$STATUS" = "200" ] || [ "$STATUS" = "302" ]; then
-                          echo "✅ Service is healthy"
-                          exit 0
-                        fi
-                        sleep 3
-                      done
-                      echo "❌ Health check failed after 15 attempts"
-                      exit 1
-
-    notify:
-        name: Notify
         runs-on: ubuntu-latest
-        timeout-minutes: 2
-        needs: [health-check]
-        if: always()
         steps:
-            - name: Deployment Summary
-              run: |
-                  echo "========================================"
-                  echo "  Deployment to staging completed!"
-                  echo "  Branch: ${{ github.ref_name }}"
-                  echo "  Commit: ${{ github.sha }}"
-                  echo "  Triggered by: ${{ github.actor }}"
-                  echo "========================================"
+            - name: Send Telegram Notification (Success)
+              uses: appleboy/telegram-action@master
+              with:
+                  to: ${{ secrets.TELEGRAM_TO }}
+                  token: ${{ secrets.TELEGRAM_TOKEN }}
+                  format: markdown
+                  message: |
+                      *STATUS: SUKSES*
+                      *Repository:* ${{ github.repository }}
+                      *Branch:* ${{ github.ref_name }}
+                      *Pusher:* ${{ github.actor }}
+
+                      Seluruh tahapan berhasil dieksekusi.
+
+    # ============================================================
+    # STAGE 9: Notification (Failure)
+    # ============================================================
+    notify-failure:
+        needs: [analyze, build, transfer, pre-deploy, deploy, health-check]
+        if: always() && contains(needs.*.result, 'failure')
+        runs-on: ubuntu-latest
+        steps:
+            - name: Send Telegram Notification (Failure)
+              uses: appleboy/telegram-action@master
+              with:
+                  to: ${{ secrets.TELEGRAM_TO }}
+                  token: ${{ secrets.TELEGRAM_TOKEN }}
+                  format: markdown
+                  message: |
+                      *STATUS: GAGAL*
+                      *Repository:* ${{ github.repository }}
+                      *Branch:* ${{ github.ref_name }}
+                      *Pusher:* ${{ github.actor }}
+
+                      *Status Tahapan:*
+                      - Analyze: ${{ needs.analyze.result }}
+                      - Build: ${{ needs.build.result }}
+                      - Transfer: ${{ needs.transfer.result }}
+                      - Pre-deploy: ${{ needs.pre-deploy.result }}
+                      - Deploy: ${{ needs.deploy.result }}
+                      - Health Check: ${{ needs.health-check.result }}
+
+                      [Lihat Log GitHub Actions](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})

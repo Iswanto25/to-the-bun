@@ -19,24 +19,29 @@ model role {
 
 model module {
   id        String   @id @default(uuid())
+  number    Int      @unique
   name      String   @unique
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   resources resource[]
+
+  @@index([number])
 }
 
 model resource {
   id               String   @id @default(uuid())
+  number           Int
   name             String
   moduleId         String
   module           module   @relation(fields: [moduleId], references: [id], onDelete: Cascade)
-  availableActions String[]
+  availableActions Action[]
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
   rolePermissions rolePermission[]
 
+  @@unique([number, moduleId])
   @@index([moduleId])
 }
 
@@ -46,7 +51,7 @@ model rolePermission {
   role           role     @relation(fields: [roleId], references: [id], onDelete: Cascade)
   resourceId     String
   resource       resource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
-  grantedActions String[]
+  grantedActions Action[]
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
@@ -83,7 +88,6 @@ model user {
   updatedAt DateTime @updatedAt
 
   profile profile?
-  otps    otp[]
 
   @@index([roleId])
   @@index([email])
@@ -102,23 +106,14 @@ model profile {
   updatedAt DateTime @updatedAt
 }
 
-enum statusOTP {
-  active
-  used
-  expired
-}
-
-model otp {
-  id        Int       @id @default(autoincrement())
-  email     String
-  code      String
-  userId    String
-  user      user      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  status    statusOTP @default(active)
-  expiredAt DateTime
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-
-  @@unique([email, status, code])
-  @@index([userId])
+enum Action {
+  CREATE
+  UPDATE
+  DELETE
+  DETAIL
+  LIST
+  IMPORT
+  EXPORT
+  ASSIGN
+  REVOKE
 }
