@@ -1,5 +1,5 @@
-import { Request, Response, NextFunction } from "express";
 import crypto from "node:crypto";
+import { HttpStatus, respons } from "@/utils/respons.js";
 
 /**
  * Generate a secure API Key with HMAC signature
@@ -15,13 +15,14 @@ export async function generateApiKey(userKey: string, secretKey: string): Promis
 }
 
 /**
- * Middleware to verify API Key and Signature
+ * Elysia beforeHandle hook — verify API Key and Signature
+ * Usage: .get("/endpoint", handler, { beforeHandle: [verifyApiKey] })
  */
-export function verifyApiKey(req: Request, res: Response, next: NextFunction) {
-	const apiKey = req.headers["x-api-key"] as string;
+export function verifyApiKey(ctx: any) {
+	const apiKey = ctx.headers["x-api-key"];
 
 	if (!apiKey) {
-		return res.status(401).json({ success: false, message: "API key tidak ditemukan" });
+		return respons.error("API key tidak ditemukan", "Unauthorized", HttpStatus.UNAUTHORIZED, ctx);
 	}
 
 	try {
@@ -29,11 +30,11 @@ export function verifyApiKey(req: Request, res: Response, next: NextFunction) {
 		const [userKey, timestamp, signature] = decoded.split(":");
 
 		if (!userKey || !timestamp || !signature) {
-			return res.status(401).json({ success: false, message: "Format tidak valid" });
+			return respons.error("Format tidak valid", "Unauthorized", HttpStatus.UNAUTHORIZED, ctx);
 		}
 
 		if (userKey !== process.env.USER_KEY) {
-			return res.status(401).json({ success: false, message: "Identitas tidak valid" });
+			return respons.error("Identitas tidak valid", "Unauthorized", HttpStatus.UNAUTHORIZED, ctx);
 		}
 
 		const requestTime = parseInt(timestamp);
@@ -42,12 +43,12 @@ export function verifyApiKey(req: Request, res: Response, next: NextFunction) {
 		const maxAge = 5 * 60 * 1000; // 5 minutes
 
 		if (timeDiff > maxAge) {
-			return res.status(401).json({ success: false, message: "Request expired" });
+			return respons.error("Request expired", "Unauthorized", HttpStatus.UNAUTHORIZED, ctx);
 		}
 
 		const secretKey = process.env.SECRET_KEY;
 		if (!secretKey) {
-			return res.status(500).json({ success: false, message: "Server configuration error" });
+			return respons.error("Server configuration error", "Internal Server Error", HttpStatus.INTERNAL_SERVER_ERROR, ctx);
 		}
 
 		const dataToVerify = `${userKey}:${timestamp}`;
@@ -56,11 +57,9 @@ export function verifyApiKey(req: Request, res: Response, next: NextFunction) {
 		const expectedSignature = hmac.digest("hex");
 
 		if (signature !== expectedSignature) {
-			return res.status(401).json({ success: false, message: "Signature tidak valid" });
+			return respons.error("Signature tidak valid", "Unauthorized", HttpStatus.UNAUTHORIZED, ctx);
 		}
-
-		next();
 	} catch {
-		return res.status(401).json({ success: false, message: "Gagal memproses kunci" });
+		return respons.error("Gagal memproses kunci", "Unauthorized", HttpStatus.UNAUTHORIZED, ctx);
 	}
 }

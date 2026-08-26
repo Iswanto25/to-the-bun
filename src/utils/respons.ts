@@ -1,7 +1,6 @@
-import { Response, Request } from "express";
 import { logger, formatIsoWithTz } from "@/utils/logger.js";
 import { saveAuditLog } from "@/utils/auditLogger.js";
-import { maskSensitive, truncateLongStrings } from "@/middlewares/requestContext.js";
+import { maskSensitive, truncateLongStrings } from "@/plugins/requestContext.plugin.js";
 
 export enum HttpStatus {
 	OK = 200,
@@ -20,33 +19,47 @@ export enum HttpStatus {
 	INTERNAL_SERVER_ERROR = 500,
 }
 
+interface ResponsCtx {
+	request?: Request;
+	// biome-ignore lint/suspicious/noExplicitAny: Elysia HTTPHeaders tidak cocok dengan Record<string, string>
+	set: { status?: number | string; headers?: any };
+	body?: unknown;
+	query?: unknown;
+	path?: string;
+	reqId?: string;
+	startTime?: number;
+	server?: { requestIP(request: Request): { address: string; port: number } | null } | null;
+	user?: { id: string; roleName?: string; profile?: { name: string | null } | null };
+}
+
 interface LogUser {
 	id?: string;
 	name: string;
 	role: string | null;
 }
 
-function getLogUser(req?: Request): LogUser {
-	if (!req?.user) return { name: "Guest", role: null };
+function getLogUser(ctx?: ResponsCtx): LogUser {
+	if (!ctx?.user) return { name: "Guest", role: null };
 
 	return {
-		id: req.user.id,
-		name: req.user.profile?.name || "Unknown",
-		role: req.user.roleName || null,
+		id: ctx.user.id,
+		name: ctx.user.profile?.name || "Unknown",
+		role: ctx.user.roleName || null,
 	};
 }
 
-function getClientIp(req: Request): string {
-	const forwarded = req.headers["x-forwarded-for"];
-	return forwarded?.toString().split(",")[0].trim() || req.socket?.remoteAddress || "unknown";
+function getClientIp(ctx: ResponsCtx): string {
+	const forwarded = ctx.request?.headers.get("x-forwarded-for");
+	return forwarded?.split(",")[0].trim() || ctx.server?.requestIP(ctx.request!)?.address || "unknown";
 }
 
-function buildLogRequest(req?: Request): Record<string, unknown> {
-	if (!req) return {};
-	const hasQuery = req.query && Object.keys(req.query).length > 0;
+function buildLogRequest(ctx?: ResponsCtx): Record<string, unknown> {
+	if (!ctx) return {};
+	const query = ctx.query;
+	const hasQuery = query && typeof query === "object" && Object.keys(query).length > 0;
 	return {
-		...(req.rawBody as Record<string, unknown> | undefined),
-		...(hasQuery ? { query: req.query } : {}),
+		...(truncateLongStrings(maskSensitive(ctx.body)) as Record<string, unknown>),
+		...(hasQuery ? { query } : {}),
 	};
 }
 
@@ -62,29 +75,29 @@ function buildLogResponse(payload: unknown, resTime: string, fallbackKey: "data"
 }
 
 export const respons = {
-	success(message: string, data: unknown, code: number, res: Response, req: Request, pagination?: any) {
-		const logUser = getLogUser(req);
-		const ip = getClientIp(req);
-		const startTime = req.startTime || Date.now();
+	success(message: string, data: unknown, code: number, ctx: ResponsCtx, pagination?: any) {
+		const logUser = getLogUser(ctx);
+		const ip = getClientIp(ctx);
+		const startTime = ctx.startTime || Date.now();
 		const now = Date.now();
 		const responseTime = now - startTime;
-		const path = req.path || req.originalUrl;
+		const path = ctx.path || new URL(ctx.request?.url || "http://localhost/").pathname;
 		const isoNow = formatIsoWithTz(new Date(now));
 
-		const reqBody = truncateLongStrings(maskSensitive(buildLogRequest(req))) as Record<string, unknown>;
+		const reqBody = truncateLongStrings(buildLogRequest(ctx)) as Record<string, unknown>;
 
 		const logPayload = {
 			level: "INFO",
 			time: isoNow,
 			path,
-			method: req.method,
+			method: ctx.request?.method,
 			status: code,
-			reqId: req.reqId,
+			reqId: ctx.reqId,
 			userId: logUser.id || null,
 			userRole: logUser.role || "GUEST",
 			request: { ...reqBody, reqTime: formatIsoWithTz(new Date(startTime)) },
 			response: buildLogResponse(data, isoNow, "data"),
-			userAgent: req.headers["user-agent"] || "Unknown",
+			userAgent: ctx.request?.headers.get("user-agent") || "Unknown",
 			durationMs: responseTime,
 			msg: "HTTP Transaction completed",
 		};
@@ -96,46 +109,48 @@ export const respons = {
 			name: logUser.name,
 			role: logUser.role,
 			ip,
-			host: `${req.protocol}://${req.get("host")}${req.originalUrl}`,
+			host: ctx.request?.url || "",
 			status: code.toString(),
-			method: req.method,
-			reqId: req.reqId,
+			method: ctx.request?.method || "UNKNOWN",
+			reqId: ctx.reqId,
 			data: logPayload,
 			date: new Date(now),
 		});
 
-		res.status(code).json({
+		ctx.set.status = code;
+
+		return {
 			success: true,
 			message,
 			data,
 			...(pagination && { pagination }),
-		});
+		};
 	},
 
-	error(message: string, error: unknown, code: number, res: Response, req?: Request) {
-		const logUser = getLogUser(req);
-		const ip = req ? getClientIp(req) : "";
-		const startTime = req?.startTime || Date.now();
+	error(message: string, error: unknown, code: number, ctx?: ResponsCtx) {
+		const logUser = getLogUser(ctx);
+		const ip = ctx ? getClientIp(ctx) : "";
+		const startTime = ctx?.startTime || Date.now();
 		const now = Date.now();
 		const responseTime = now - startTime;
-		const path = req?.path || req?.originalUrl || "unknown";
+		const path = ctx?.path || (ctx?.request ? new URL(ctx.request.url).pathname : "unknown");
 		const isoNow = formatIsoWithTz(new Date(now));
 		const hint = (error as any)?.hint || (error as any)?.code || undefined;
 
-		const reqBody = truncateLongStrings(maskSensitive(buildLogRequest(req))) as Record<string, unknown>;
+		const reqBody = truncateLongStrings(buildLogRequest(ctx)) as Record<string, unknown>;
 
 		const logPayload = {
 			level: "ERROR",
 			time: isoNow,
 			path,
-			method: req?.method || "UNKNOWN",
+			method: ctx?.request?.method || "UNKNOWN",
 			status: code,
-			reqId: req?.reqId,
+			reqId: ctx?.reqId,
 			userId: logUser.id || null,
 			userRole: logUser.role || "GUEST",
 			request: { ...reqBody, reqTime: formatIsoWithTz(new Date(startTime)) },
 			response: buildLogResponse(error, isoNow, "error"),
-			userAgent: req?.headers["user-agent"] || "Unknown",
+			userAgent: ctx?.request?.headers.get("user-agent") || "Unknown",
 			durationMs: responseTime,
 			...(hint ? { hint } : {}),
 			msg: "HTTP Transaction completed",
@@ -148,20 +163,22 @@ export const respons = {
 			name: logUser.name,
 			role: logUser.role,
 			ip,
-			host: req ? `${req.protocol}://${req.get("host")}${req.originalUrl}` : "",
+			host: ctx?.request?.url || "",
 			status: code.toString(),
-			method: req?.method || "UNKNOWN",
-			reqId: req?.reqId,
+			method: ctx?.request?.method || "UNKNOWN",
+			reqId: ctx?.reqId,
 			data: logPayload,
 			date: new Date(now),
 		});
 
-		res.status(code).json({
+		if (ctx) ctx.set.status = code;
+
+		return {
 			success: false,
 			message,
 			hint,
 			error,
-		});
+		};
 	},
 };
 

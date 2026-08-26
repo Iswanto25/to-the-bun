@@ -1,6 +1,6 @@
-# Express.js & TypeScript Boilerplate (Bun Native)
+# Bun + ElysiaJS Boilerplate
 
-Boilerplate production-ready untuk membangun REST API menggunakan Express.js, TypeScript, dan Prisma, dioptimalkan sepenuhnya untuk **Bun**. Arsitektur proyek ini dirancang agar modular, scalable, dan mendukung sistem otorisasi yang kompleks.
+Boilerplate production-ready untuk REST API menggunakan **ElysiaJS**, TypeScript, dan Prisma, berjalan sepenuhnya di **Bun**. Arsitektur modular, scalable, dengan RBAC, JWT auth, background jobs (BullMQ), S3 upload, dan structured logging.
 
 > **Dibangun dengan AI Agent:**
 >
@@ -10,478 +10,193 @@ Boilerplate production-ready untuk membangun REST API menggunakan Express.js, Ty
 > - [Antygrafity](https://antygrafity.ai/) — Multi Model
 > - [Google Jules](https://github.com/google/jules) + Google Gemini 3 Pro
 
-## 🧠 Filosofi Arsitektur
-
-Boilerplate ini dikembangkan dengan prinsip **"Scalability through Simplicity & Separation"**. Berikut adalah pilar utama arsitektur kami:
+## Filosofi Arsitektur
 
 ### 1. Modular Feature-based Architecture
 
-Berbeda dengan pola MVC tradisional yang mengelompokkan file berdasarkan _tipe_ (semua controller di satu folder), kami mengelompokkan berdasarkan **Fitur**.
+Setiap fitur (misal: `auth`) memiliki ekosistem sendiri: controller, service, repository, validation, dan jobs.
 
-- Setiap fitur (misal: `auth`) memiliki ekosistem sendiri: controller, service, repository, validation, dan jobs.
-- **Manfaat**: Memudahkan navigasi saat proyek membesar dan memungkinkan penghapusan atau penambahan fitur secara terisolasi tanpa merusak bagian lain.
+- **Manfaat**: Navigasi mudah saat proyek membesar, fitur bisa ditambah/hapus secara terisolasi.
 
 ### 2. Separation of Concerns (SoC) dengan Repository Pattern
 
-Kami membagi tanggung jawab ke dalam lapisan yang jelas:
-
-- **Controllers**: Hanya menangani request/response dan validasi skema (Zod).
-- **Services**: Berisi _Business Logic_. Di sini tempat aturan bisnis dijalankan.
-- **Repositories**: Satu-satunya lapisan yang berinteraksi dengan Database (Prisma). Lapisan ini mengabstraksi kompleksitas query.
-- **Jobs**: Menangani tugas berat secara asinkron (Event-driven) agar API tetap responsif.
+- **Controllers**: Request/response dan validasi skema (Zod). Tidak ada try-catch — error propagate ke global handler.
+- **Services**: Business logic dan aturan bisnis.
+- **Repositories**: Satu-satunya lapisan yang berinteraksi dengan Database (Prisma).
+- **Jobs**: Tugas berat asinkron (BullMQ) agar API tetap responsif.
 
 ### 3. Graceful Degradation & Resilience
 
-Aplikasi dirancang untuk tetap berjalan meskipun layanan pendukung (Redis, S3, SMTP) tidak tersedia atau salah konfigurasi.
+- **Optional Services**: Redis, S3, SMTP — jika tidak tersedia, aplikasi tetap berjalan dengan fallback + warning log.
+- **Background Jobs**: BullMQ dengan auto-retry (3x exponential backoff).
 
-- **Optional Services**: Jika Redis mati, sistem akan otomatis melakukan _fallback_ ke in-memory atau melewati fungsi tersebut dengan log peringatan, bukan menghentikan seluruh aplikasi.
-- **Background Jobs**: Menggunakan BullMQ untuk memastikan tugas yang gagal dapat dicoba kembali secara otomatis (_auto-retry_).
+### 4. Developer Experience & Performance
 
-### 4. Developer Experience (DX) & Performance
-
-- **Bun Native**: Menggunakan Bun untuk kecepatan eksekusi dan tooling yang terintegrasi (test runner, package manager).
-- **Type-Safety**: Penggunaan TypeScript dan Zod memastikan error terdeteksi saat development, bukan saat runtime.
-- **Path Alias**: Menghindari "relative import hell" dengan alias `@/`.
+- **Bun Native**: Test runner, package manager, dan build tool terintegrasi.
+- **ElysiaJS**: Web framework yang dirancang khusus untuk Bun — performa optimal.
+- **Type-Safety**: TypeScript + Zod memastikan error terdeteksi saat development.
 
 ---
 
-## ✨ Fitur Utama
+## Fitur Utama
 
-- **Runtime**: **Bun**-native untuk performa eksekusi dan development yang sangat cepat
-- **Framework**: Express.js v5 dengan TypeScript
-- **Architecture**: Modular Feature-based Architecture dengan Repository Pattern
-- **ORM**: Prisma v7 untuk database management yang modern dan type-safe
-- **Authorization (RBAC)**:
-    - Role-Based Access Control yang granular
-    - Pengelolaan Module, Resource, dan Action-based permissions
-    - Middleware `requirePermission` untuk proteksi endpoint berbasis role
-- **Background Jobs**:
-    - **BullMQ** integration untuk antrian tugas asinkron
-    - **Single File per Feature**: Semua Queue, Worker, dan Processor dikonsolidasikan dalam satu file per fitur (misal: `auth.jobs.ts`) untuk kemudahan maintenance.
-    - Dedicated **Worker** process untuk memproses jobs (upload, email, dll)
-    - Redis-backed job management
-- **Authentication**:
-    - JWT-based authentication system (Access & Refresh tokens)
-    - Multi-device login support
-    - Token caching with Redis (optional)
-    - Password hashing with double-layer bcrypt
-- **Security**:
-    - **Zod** untuk validasi skema input yang type-safe
-    - Helmet untuk HTTP headers security
-    - CORS dengan konfigurasi environment-based
-    - Rate limiting dengan Redis (optional)
-    - API Signature verification (HMAC-SHA256)
-    - **NIK (National ID) encryption with AES-256-GCM**
-- **File Management**:
-    - Upload file via **BullMQ jobs** untuk performa tinggi
-    - Integrasi S3 Storage (optional)
-    - Support base64 upload untuk images
-    - Public URL access for secure file delivery
-- **Logging & Monitoring**:
-    - Structured logging dengan **Pino** dan **pino-http**
-    - Database logging (audit trail) via `logs` model
-    - Performance profiling & auto-generated reports
-- **Error Handling**: Global error handler dan custom HTTP exceptions
-- **Code Quality**: ESLint, Prettier, dan Comprehensive test suite dengan Jest & Bun Test
-- **Path Alias**: Import menggunakan alias `@/` (misal: `@/utils/jwt`)
+| Layer | Tech |
+|---|---|
+| Runtime | **Bun** (v1.x) |
+| Framework | **ElysiaJS** (Bun-native) |
+| Language | TypeScript (ESM, bundler) |
+| ORM | Prisma v7 + PostgreSQL |
+| Cache/Queue | Redis (ioredis) + BullMQ |
+| Auth | JWT (access 1d, refresh 7d) + Redis token store |
+| Storage | MinIO/S3 via @aws-sdk |
+| Logger | Pino (via response helper) |
+| Test | Bun test runner (`bun test`) |
+| Container | Docker multi-stage |
 
-## 📂 Struktur Proyek
+- **RBAC** granular: Module → Resource → Action-based permissions. Role "Superadmin" bypass semua check.
+- **Security**: Zod validation, custom security headers, CORS, rate limiting (Redis), HMAC-SHA256 API signature, AES-256-GCM NIK encryption.
+- **Upload**: File via BullMQ jobs (base64), S3 presigned URL, `Bun.file()` native.
+- **Password**: `Bun.password.hash/verify` dengan bcrypt, configurable salt rounds.
+
+## Struktur Proyek
 
 ```
-/
-├── prisma/
-│   ├── schema.prisma        # Database schema (User, Role, Permission, Logs)
-│   ├── prisma.config.ts     # Prisma v7 config
-│   └── migrations/          # Database migrations
-├── src/
-│   ├── app.ts               # API entry point
-│   ├── worker.ts            # Worker process entry point
-│   ├── configs/             # BullMQ, Redis, Database, Express configs
-│   ├── features/            # Feature-based modules
-│   │   └── auth/            # Auth feature
-│   │       ├── jobs/        # Background jobs (auth.jobs.ts)
-│   │       ├── controllers/
-│   │       ├── repositories/
-│   │       ├── services/
-│   │       └── validations/
-│   ├── middlewares/         # Custom middlewares (Auth, RBAC, Multer)
-│   ├── routes/              # API route definitions
-│   └── utils/               # Utility functions (Encryption, JWT, Mail, S3)
-├── .env.example             # Environment variables template
-├── CHANGELOG.md             # Project changelog
-└── README.md
+src/
+├── app.ts                          # API server entry point
+├── dev.ts                          # Dev entry — server + worker combined
+├── worker.ts                       # BullMQ worker entry point
+├── configs/
+│   ├── elysia.ts                   # Elysia app setup (security headers, cors, routes, error handler)
+│   ├── database.ts                 # Prisma client
+│   ├── redis.ts                    # Redis client (graceful degradation)
+│   └── bull.ts                     # BullMQ connection
+├── features/
+│   ├── auth/
+│   │   ├── controllers/            # HTTP request handlers
+│   │   ├── services/               # Business logic
+│   │   ├── repositories/           # Prisma data access (transaction-aware)
+│   │   ├── validations/            # Zod schemas
+│   │   ├── types/                  # Zod-inferred types
+│   │   ├── jobs/                   # BullMQ queue, worker, job processor
+│   │   └── auth.routes.ts          # Elysia route definitions
+│   └── upload/                     # File upload (presigned URL)
+├── middlewares/                     # (removed — replaced by plugins)
+├── plugins/
+│   ├── requestContext.plugin.ts    # Request ID, sensitive data masking
+│   ├── auth.plugin.ts              # JWT verification + user loading
+│   ├── rbac.plugin.ts              # Permission check (beforeHandle hook)
+│   └── rateLimiter.plugin.ts       # Redis-based rate limiter
+├── routes/
+│   └── index.ts                    # Elysia route aggregator
+└── utils/
+    ├── encryption.ts               # AES-256-GCM encrypt/decrypt
+    ├── jwt.ts                      # JWT sign/verify helpers
+    ├── logger.ts                   # Pino logger setup
+    ├── mail.ts                     # HTML email templates
+    ├── pagination.ts               # Pagination helper
+    ├── respons.ts                  # respons.success/error + apiError class
+    ├── s3.ts                       # S3/MinIO helpers
+    ├── signature.ts                # HMAC-SHA256 API key verification
+    ├── smtp.ts                     # Nodemailer SMTP sender
+    ├── tokenStore.ts               # Redis token CRUD
+    ├── auditLogger.ts              # Audit log DB writer (buffered)
+    └── utils.ts                    # Password hashing, validation, OTP, pLimit
 ```
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Prerequisites
 
-- [Bun](https://bun.sh/) v1.1 atau lebih baru
-- Database yang didukung Prisma (PostgreSQL, MySQL, SQLite, dll)
-- Redis server (untuk BullMQ & caching)
+- [Bun](https://bun.sh/) v1.1+
+- PostgreSQL
+- Redis (untuk BullMQ & caching)
 
 ### Installation
 
-1. **Clone repository:**
-
-    ```bash
-    git clone git@github.com:Iswanto25/boilerplate-expressJs.git
-    cd boilerplate-expressJs
-    ```
-
-2. **Install dependencies:**
-
-    ```bash
-    bun install
-    ```
-
-3. **Setup environment variables:**
-
-    Salin `.env.example` menjadi `.env`:
-
-    ```bash
-    cp .env.example .env
-    ```
-
-    **Required Variables:**
-
-    ```env
-    # Application
-    NODE_ENV=development
-    PORT=4004
-    HOST=localhost
-    DOMAIN=localhost
-    ALLOWED_ORIGINS=http://localhost:4004,http://localhost:5173
-
-    # Database (Required)
-    DATABASE_URL="your-database-connection-string"
-
-    # Security (Required)
-    DATA_ENCRYPTION_KEY="your-32-character-hex-key"
-    JWT_SECRET="your-jwt-secret-key"
-    JWT_REFRESH_SECRET="your-refresh-secret-key"
-
-    # Password Security (Optional)
-    SALT_HASH="your-custom-salt-string"  # Additional salt for password hashing
-    SALT_ROUNDS=5                         # bcrypt salt rounds (default: 5)
-    ```
-
-    **Optional Services:**
-
-    ```env
-    # Redis (Optional - for rate limiting & token caching)
-    REDIS_HOST=localhost
-    REDIS_PORT=6379
-    REDIS_PASSWORD=
-    REDIS_DB=0
-
-    # S3 Storage (Optional - for file uploads)
-    S3_ENDPOINT=localhost:9000
-    S3_BUCKET_NAME=your-bucket
-    S3_ACCESS_KEY=your-access-key
-    S3_SECRET_KEY=your-secret-key
-    S3_USE_SSL=false
-    S3_REGION=us-east-1
-
-    # SMTP (Optional - for email sending)
-    SMTP_HOST=smtp.gmail.com
-    SMTP_PORT=587
-    SMTP_SECURE=false
-    SMTP_USER=your-email@gmail.com
-    SMTP_PASS=your-app-password
-    ```
-
-4. **Setup database:**
-
-    > [!IMPORTANT]
-    > **Catatan Prisma v7:** Proyek ini menggunakan **Prisma v7** (pastikan `prisma` dan `@prisma/client` minimal versi 7).
-    > Berbeda dengan versi lama, pada versi 7 koneksi URL diletakkan di `prisma.config.ts`, bukan di dalam `schema.prisma`. File `prisma.config.ts` membutuhkan `dotenv` untuk membaca `.env`.
-
-    Karena ini adalah proyek Bun dan menggunakan Prisma v7, gunakan `bunx` agar konfigurasi tereksekusi dengan sempurna:
-
-    ```bash
-    # Generate Prisma client
-    bunx prisma generate
-
-    # Run migrations
-    bunx prisma migrate dev
-
-    # Seed initial database (Roles, Modules, Users)
-    bunx prisma db seed
-    ```
-
-5. **Cara Menjalankan:**
-
-    Proyek ini memiliki **dua proses** yang berjalan terpisah:
-
-    ### 📡 Development (`dev.ts`)
-
-    **Satu command menjalankan API Server + Worker sekaligus.**
-
-    ```bash
-    bun run dev
-    ```
-
-    Server akan berjalan di `http://localhost:4004` dan worker siap memproses background job (upload file, kirim email, dll).
-
-    ### 🚀 Production
-
-    Di production, API server dan worker dijalankan terpisah agar bisa di-scale independently.
-
-    **API Server:**
-
-    ```bash
-    bun run build
-    bun run start
-    ```
-
-    **Worker:**
-
-    ```bash
-    bun run worker:start
-    ```
-
-    ### 🏃 Urutan Menjalankan (Development)
-    1. Pastikan PostgreSQL dan Redis sudah berjalan
-    2. Setup database: `npx prisma generate && npx prisma migrate dev`
-    3. Jalankan: `bun run dev`
-    4. Server + Worker siap di `http://localhost:4004`
-
-## 📜 Available Scripts
-
-| Script                     | Description                                     |
-| -------------------------- | ----------------------------------------------- |
-| `bun run dev`              | Start development server dengan hot-reload      |
-| `bun run worker:dev`       | Start worker dengan hot-reload                  |
-| `bun run build`            | Compile TypeScript ke JavaScript (app + worker) |
-| `bun run start`            | Run production server                           |
-| `bun run worker:start`     | Run production worker                           |
-| `bun run start:migrate`    | Run migrations dan start server                 |
-| `bun test`                 | Run test suite                                  |
-| `bun run lint`             | Check linting errors                            |
-| `bun run lint:fix`         | Fix linting errors                              |
-| `bun run prettier`         | Format code dengan Prettier                     |
-| `bun run generate-api-key` | Generate API key dengan signature               |
-| `bun run generate-data`    | Generate dummy data (Users, Roles, etc)         |
-
-## 🚀 CI/CD
-
-Project ini menggunakan **GitHub Actions** untuk continuous integration dan deployment.
-
-### Staging Deploy
-
-Push ke branch `staging` akan otomatis memicu pipeline 7 jobs:
-
-1. **Lint** — ESLint check
-2. **Unit Tests** — Utils, middlewares, auth services & controllers
-3. **Integration Tests** — Auth API HTTP tests
-4. **Build** — Compile via Bun
-5. **Deploy** — SCP artifacts ke VPS, blue-green canary deploy, swap PM2 processes
-6. **Health Check** — SSH curl `localhost:4004/health`
-7. **Notify** — Deployment summary
-
-Workflow: `.github/workflows/deploy-staging.yml`
-
-Secrets yang diperlukan:
-
-- `SSH_HOST_STAGING`, `SSH_USER_STAGING`, `SSH_KEY_STAGING`, `SSH_PASSWORD_STAGING`, `SSH_PASSPHRASE_STAGING`, `SSH_PORT_STAGING`
-- `ENV_STAGING` — isi environment variables untuk staging
-
-## 🧪 Testing
-
-Project ini dilengkapi dengan comprehensive test suite menggunakan **Bun test**:
-
 ```bash
-# Run all tests
-bun test
-
-# Run unit tests (middlewares)
-bun run test:unit
-
-# Run integration tests
-bun run test:integration
-
-# Run infrastructure tests
-bun run test:infra
+git clone git@github.com:Iswanto25/boilerplate-bun-elysia.git
+cd boilerplate-bun-elysia
+bun install
+cp .env.example .env
 ```
 
-Test coverage meliputi:
-
-- Auth controllers & services (16+ tests)
-- Middleware: Auth, RBAC, Error Handler (25 tests)
-- Encryption, JWT, Logger, Pagination, Utils
-- Integration: Auth API endpoints (8 tests)
-- Response formatting, Rate limiting, S3, SMTP, Token store
-
-### 📮 API Testing dengan Postman
-
-Project ini juga sudah dilengkapi dengan Postman Collection yang terintegrasi (auto-set token).
-
-1. Buka aplikasi **Postman**.
-2. Klik **Import** dan pilih file `postman_collection.json` di root direktori proyek ini.
-3. Environment variables seperti `{{baseUrl}}`, `{{token}}`, dan `{{refreshToken}}` sudah siap pakai. Endpoint `Login` akan otomatis mengisi variabel token setelah berhasil login.
-
-## 🔒 Security Features
-
-- ✅ **Helmet** - Secure HTTP headers
-- ✅ **CORS** - Configurable cross-origin requests
-- ✅ **Rate Limiting** - Prevent API abuse (with Redis)
-- ✅ **Data Encryption** - Sensitive data encryption
-- ✅ **JWT Authentication** - Secure token-based auth
-- ✅ **Input Validation** - Request payload validation
-- ✅ **Error Handling** - Secure error responses (no stack traces in production)
-- ✅ **Password Hashing** - Enhanced bcrypt integration with:
-    - Configurable salt rounds (SALT_ROUNDS environment variable)
-    - Additional custom salt hash (SALT_HASH environment variable)
-    - Double-layer hashing for extra security
-
-## 🔐 API Signature
-
-Boilerplate ini menyediakan sistem API Signature untuk melindungi endpoint tertentu dengan HMAC-SHA256 signature.
-
-### Cara Kerja
-
-1. **Generate API Key**: Client membuat API key dengan format `base64(userKey:timestamp:signature)`
-2. **Signature**: Dibuat dengan HMAC-SHA256 dari `userKey:timestamp` menggunakan `SECRET_KEY`
-3. **Verify**: Server memverifikasi signature dan memeriksa expiry (default: 5 menit)
-
-### Setup
-
-Tambahkan ke `.env`:
+**Required Variables:**
 
 ```env
-USER_KEY=your-user-key-change-this-in-production
-SECRET_KEY=your-secret-key-change-this-in-production
+NODE_ENV=development
+PORT=4004
+HOST=localhost
+DATABASE_URL="your-database-connection-string"
+DATA_ENCRYPTION_KEY="your-32-character-hex-key"
+JWT_SECRET="your-jwt-secret-key"
+JWT_REFRESH_SECRET="your-refresh-secret-key"
+SALT_ROUNDS=10  # bcrypt salt rounds (4-31)
 ```
 
-### Generate API Key
+**Optional Services:**
 
-Gunakan script yang sudah disediakan:
+```env
+# Redis
+REDIS_HOST=localhost
+REDIS_PORT=6379
+
+# S3 Storage
+S3_ENDPOINT=localhost:9000
+S3_BUCKET_NAME=your-bucket
+S3_ACCESS_KEY=your-access-key
+S3_SECRET_KEY=your-secret-key
+
+# SMTP
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=your-email@gmail.com
+SMTP_PASS=your-app-password
+```
+
+### Setup Database
 
 ```bash
-bun run generate-api-key
+bunx prisma generate
+bunx prisma migrate dev
+bunx prisma db seed
 ```
 
-Output:
+### Menjalankan
 
-```
-========================================
-🔑 API Key Generator
-========================================
-User Key: your-user-key
-API Key: eW91ci11c2VyLWtleToxNzA2NTE0MDAwMDAwOmFiY2RlZjEyMzQ1Njc4OTA=
-========================================
-
-📝 Cara menggunakan:
-Tambahkan header berikut pada request:
-x-api-key: eW91ci11c2VyLWtleToxNzA2NTE0MDAwMDAwOmFiY2RlZjEyMzQ1Njc4OTA=
-
-⏰ Catatan:
-API Key ini valid selama 5 menit
-========================================
-```
-
-### Implementasi di Route
-
-```typescript
-import { Router } from "express";
-import { verifyApiKey } from "../utils/signature";
-import { requirePermission } from "../middlewares/rbacMiddleware";
-
-const router = Router();
-
-// Protected endpoint dengan signature & RBAC
-router.get("/protected", verifyApiKey, requirePermission("example", "read"), (req, res) => {
-	res.json({ message: "Access granted!" });
-});
-
-export default router;
-```
-
-### Testing dengan cURL
+**Development** (server + worker dalam satu process):
 
 ```bash
-# Generate API key
-bun run generate-api-key
-
-# Test protected endpoint
-curl -H "x-api-key: YOUR_GENERATED_API_KEY" http://localhost:3004/api/example/protected
-
-# Test public endpoint (tidak perlu API key)
-curl http://localhost:3004/api/example/public
+bun run dev
 ```
 
-### Response Format
+**Production** (server dan worker terpisah):
 
-**Success (200):**
+```bash
+# API Server
+bun run build
+bun run start
 
-```json
-{
-	"success": true,
-	"message": "Access granted",
-	"data": {
-		"message": "Ini adalah endpoint yang dilindungi dengan API signature",
-		"timestamp": "2024-12-24T07:00:00.000Z",
-		"info": "API Key Anda valid!"
-	}
-}
+# Worker (terpisah)
+bun run worker:start
 ```
 
-**Error (401):**
+Server berjalan di `http://localhost:4004`.
 
-```json
-{
-	"success": false,
-	"message": "API key tidak ditemukan"
-}
-```
+## Available Scripts
 
-```json
-{
-	"success": false,
-	"message": "API key sudah expired atau tidak valid"
-}
-```
+| Script | Description |
+|---|---|
+| `bun run dev` | Start development server + worker (hot-reload) |
+| `bun run worker:dev` | Start worker saja (hot-reload) |
+| `bun run build` | Bundle app.js + worker.js |
+| `bun run start` | Run production server |
+| `bun run worker:start` | Run production worker |
+| `bun run start:migrate` | Migrate + start server |
+| `bun test` | Run test suite |
+| `bun run lint` | Check linting |
+| `bun run lint:fix` | Fix linting |
 
-```json
-{
-	"success": false,
-	"message": "Signature API key tidak valid"
-}
-```
-
-## 🔌 Optional Services
-
-### Redis (Optional)
-
-- **Purpose**: Rate limiting dan token caching
-- **If not configured**:
-    - Rate limiting dilewati dengan warning log
-    - Token storage dilewati dengan warning log
-    - Aplikasi tetap berjalan normal
-
-### S3 Storage (Optional)
-
-- **Purpose**: File upload dan storage
-- **If not configured**:
-    - File routes return 503 Service Unavailable
-    - Warning ditampilkan saat startup
-- **Features**:
-    - Multipart file upload
-    - Base64 upload support
-    - Presigned URL generation
-    - File deletion
-
-### SMTP (Optional)
-
-- **Purpose**: Email sending (notifications, password reset, etc)
-- **If not configured**:
-    - Email operations dilewati dengan warning log
-    - Aplikasi tetap berjalan normal
-
-**Note**: Hanya Database yang wajib dikonfigurasi. Semua layanan lain bersifat optional dan aplikasi akan gracefully degrade jika tidak tersedia.
-
-## 📝 API Endpoints
+## API Endpoints
 
 ### Health Check
 
@@ -489,134 +204,202 @@ curl http://localhost:3004/api/example/public
 GET /health
 ```
 
-Response:
-
 ```json
 {
-	"status": "ok",
-	"timestamp": "2024-12-24T07:00:00.000Z",
-	"environment": "development"
+  "success": true,
+  "message": "Service is healthy",
+  "data": {
+    "status": "ok",
+    "timestamp": "2026-08-26 21:13:45",
+    "version": "1.0.0",
+    "environment": "development"
+  }
 }
 ```
 
 ### Authentication
 
-| Method   | Endpoint                    | Description                                      |
-| -------- | --------------------------- | ------------------------------------------------ |
-| `POST`   | `/api/auth/register`        | Register user baru dengan profil & foto (base64) |
-| `POST`   | `/api/auth/login`           | Login user, mengembalikan data user + foto URL   |
-| `POST`   | `/api/auth/refresh-token`   | Refresh access token                             |
-| `POST`   | `/api/auth/logout`          | Logout user                                      |
-| `GET`    | `/api/auth/profile`         | Get profil user dengan foto URL                  |
-| `GET`    | `/api/auth/users`           | Get semua user dengan data profil dan foto URL   |
-| `POST`   | `/api/auth/forgot-password` | Kirim OTP email untuk reset password             |
-| `PUT`    | `/api/auth/profile`         | Update profil user (name, phone, address, photo) |
-| `DELETE` | `/api/auth/profile`         | Hapus akun user & cleanup file S3                |
+| Method | Endpoint | Description |
+|---|---|---|
+| `POST` | `/api/auth/register` | Register user baru |
+| `POST` | `/api/auth/login` | Login, mengembalikan access + refresh token |
+| `POST` | `/api/auth/refresh-token` | Refresh access token |
+| `POST` | `/api/auth/logout` | Logout user |
+| `GET` | `/api/auth/profile` | Get profil user |
+| `GET` | `/api/auth/users` | Get semua user (pagination + search) |
+| `PATCH` | `/api/auth/profile` | Update profil |
+| `PATCH` | `/api/auth/profile/photo` | Upload foto profil (multipart) |
+| `PATCH` | `/api/auth/profile/photo/direct` | Upload foto via presigned URL |
+| `DELETE` | `/api/auth/profile/:id` | Hapus akun |
+| `POST` | `/api/auth/forgot-password` | Kirim email reset password |
+| `POST` | `/api/auth/reset-password` | Reset password dengan token |
+| `POST` | `/api/auth/send-otp` | Kirim OTP ke email |
+| `POST` | `/api/auth/verify-otp` | Verifikasi OTP |
 
-### File Upload (requires S3 Storage)
+### Upload (requires S3)
 
-| Method   | Endpoint                       | Description                          |
-| -------- | ------------------------------ | ------------------------------------ |
-| `POST`   | `/api/files/upload`            | Upload file (multipart/form-data)    |
-| `POST`   | `/api/files/upload-base64`     | Upload file base64 encoded           |
-| `GET`    | `/api/files/:folder/:fileName` | Get direct public URL (`urlStorage`) |
-| `DELETE` | `/api/files/:folder/:fileName` | Hapus file                           |
+| Method | Endpoint | Description |
+|---|---|---|
+| `POST` | `/api/upload/presigned-url` | Generate presigned URL |
+| `POST` | `/api/upload/confirm` | Konfirmasi upload |
 
-### API Signature Examples
-
-| Method | Endpoint                 | Description                                              |
-| ------ | ------------------------ | -------------------------------------------------------- |
-| `GET`  | `/api/example/protected` | Endpoint dilindungi signature (butuh `x-api-key` header) |
-| `GET`  | `/api/example/public`    | Endpoint publik (tanpa autentikasi)                      |
-
-## 📧 Email Templates
-
-Project ini menyediakan email template system yang modular dan reusable. Lihat [Email Templates Documentation](./docs/EMAIL_TEMPLATES.md) untuk detail lengkap.
-
-### Available Templates
-
-- **OTP Email** - Untuk password reset
-- **Verification Email** - Untuk account activation
-- **Welcome Email** - Untuk new users
-- **Password Changed Email** - Konfirmasi perubahan password
-- **Generic OTP Email** - Customizable untuk berbagai keperluan
-
-### Usage Example
+## Route Pattern
 
 ```typescript
-import { generateOTPEmail } from "../utils/mail";
-import { sendEmail } from "../utils/smtp";
+import { Elysia } from "elysia";
+import { authController } from "./controllers/auth.controller.js";
+import { verifyToken } from "../../plugins/auth.plugin.js";
+import { rateLimiter } from "../../plugins/rateLimiter.plugin.js";
 
-const html = generateOTPEmail("John Doe", "123456");
-await sendEmail({
-	to: "user@example.com",
-	subject: "Reset Password",
-	html,
-	fromName: process.env.APP_NAME,
-	fromEmail: process.env.SMTP_USER,
-});
+const publicRoutes = new Elysia()
+  .post("/register", authController.register)
+  .post("/login", authController.login);
+
+const protectedRoutes = new Elysia({ name: "auth-protected" })
+  .use(verifyToken)
+  .get("/profile", authController.profile, {
+    beforeHandle: [rateLimiter({ windowInSeconds: 30, maxRequests: 3, useUserId: true })],
+  });
+
+export const authRoutes = new Elysia({ prefix: "/auth" })
+  .use(publicRoutes)
+  .use(protectedRoutes);
 ```
 
-## 🛠️ Tech Stack
+## Controller Pattern
 
-### Core Dependencies
+```typescript
+export const authController = {
+  register: async (ctx: any) => {
+    const data = validateOrThrow(authValidation.register, ctx.body);
+    const result = await authServices.register(data);
+    return respons.success("Berhasil register", result, HttpStatus.OK, ctx);
+  },
 
-- **bun** (v1.1.x) - Runtime & Package manager
-- **express** (v5.1.0) - Web framework
-- **typescript** (v5.9.3) - Type safety
-- **@prisma/client** (v7.4.2) - Database ORM
-- **zod** (v4.3.6) - Schema validation
-- **bullmq** (v5.76.6) - Background jobs
-- **ioredis** (v5.8.2) - Redis client
-- **jsonwebtoken** (v9.0.2) - JWT authentication
+  profile: async (ctx: any) => {
+    const result = await authServices.profile(ctx.user.id);
+    return respons.success("Berhasil get profile", result, HttpStatus.OK, ctx);
+  },
+};
+```
+
+- Tidak ada try-catch — error throw ke global handler via `apiError`.
+- Input dari `ctx.body`, `ctx.query`, `ctx.params`. User dari `ctx.user`.
+
+## Plugin System
+
+### Request Context (derive global)
+
+```typescript
+export const requestContext = new Elysia({ name: "request-context" })
+  .derive({ as: "global" }, ({ request }) => ({
+    reqId: request.headers.get("x-request-id") || crypto.randomUUID(),
+    startTime: Date.now(),
+  }));
+```
+
+### Auth (derive global)
+
+```typescript
+export const verifyToken = new Elysia({ name: "auth" })
+  .derive({ as: "global" }, async ({ headers, set }) => {
+    // Verify JWT, load user from Redis/DB, attach to ctx.user
+  });
+```
+
+### RBAC (beforeHandle hook)
+
+```typescript
+export const requirePermission = (resourceName: string, action: string) => {
+  return async (ctx: any) => {
+    // Check ctx.user.roleId against RolePermission + Resource
+  };
+};
+```
+
+### Rate Limiter (beforeHandle hook)
+
+```typescript
+export const rateLimiter = (options: { windowInSeconds: number; maxRequests: number; useUserId?: boolean }) => {
+  return async (ctx: any) => {
+    // Redis-based sliding window, graceful degradation if Redis unavailable
+  };
+};
+```
+
+## Security Features
+
+- **Custom Security Headers** — via Elysia onRequest hook (CSP, HSTS, X-Frame-Options, X-Content-Type-Options, dll)
+- **CORS** — configurable via environment
+- **Rate Limiting** — Redis-based sliding window (optional, graceful degradation)
+- **JWT Authentication** — access token (1d) + refresh token (7d) with Redis token store
+- **RBAC** — granular permission per module/resource/action
+- **Input Validation** — Zod schemas with `validateOrThrow()`
+- **Password Hashing** — `Bun.password.hash/verify` with configurable bcrypt salt rounds
+- **NIK Encryption** — AES-256-GCM for sensitive data
+- **API Signature** — HMAC-SHA256 with expiry
+- **Error Handling** — secure error responses, no stack traces in production
+
+## Testing
+
+```bash
+# All tests
+bun test
+
+# Integration tests
+bun run test:integration
+
+# Infrastructure tests
+bun run test:infra
+```
+
+## Tech Stack
+
+### Core
+
+- **bun** (v1.x) — Runtime & package manager
+- **elysia** (v1.4.x) — Web framework (Bun-native)
+- **typescript** (v5.9.x) — Type safety
+- **@prisma/client** (v7.x) — Database ORM
+- **zod** (v4.x) — Schema validation
+- **bullmq** (v5.x) — Background jobs
+- **ioredis** (v5.x) — Redis client
+- **jsonwebtoken** (v9.x) — JWT authentication
 
 ### Security
 
-- **helmet** (v8.1.0) - Security headers
-- **cors** (v2.8.5) - CORS handling
+- **@elysiajs/cors** — CORS handling
 
 ### File Handling
 
-- **multer** (v2.0.2) - File upload (temporary handling)
-- **@aws-sdk/client-s3** (v3.917.0) - S3 integration
+- **@aws-sdk/client-s3** (v3.x) — S3 integration
 
 ### Utilities
 
-- **pino** (v10.1.0) - Logging
-- **nodemailer** (v7.0.10) - Email sending
-- **dotenv** (v17.2.3) - Environment variables
+- **pino** (v10.x) — Logging
+- **nodemailer** (v7.x) — Email sending
+- **dotenv** (v17.x) — Environment variables
 
 ### Development & Testing
 
-- **jest** (v30.2.0) - Testing framework
-- **bun test** - Native fast testing
-- **eslint** (v9.39.1) - Linting
-- **prettier** - Code formatting
-- **supertest** - API testing
+- **bun test** — Native fast testing
+- **eslint** (v9.x) — Linting
+- **prettier** — Code formatting
 
-## 🤝 Contributing
+## CI/CD
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+### GitHub Actions Staging Deploy
 
-## � Documentation
+Push ke branch `staging` memicu pipeline 7 jobs:
 
-- [CHANGELOG](./CHANGELOG.md) - Detailed version history and changes
-- [Email Templates Guide](./docs/EMAIL_TEMPLATES.md) - Email template usage and examples
+1. **Lint** — ESLint check
+2. **Unit Tests** — Utils, plugins, auth services & controllers
+3. **Integration Tests** — Auth API HTTP tests
+4. **Build** — Bundle via Bun
+5. **Deploy** — SCP + PM2 canary deploy
+6. **Health Check** — SSH curl `localhost:4004/health`
+7. **Notify** — Deployment summary
 
-## �📄 License
+## License
 
-This project is licensed under the ISC License.
-
-## 👤 Author
-
-Created by [Iswanto25](https://github.com/Iswanto25)
-
-## 🔗 Links
-
-- **Repository**: [github.com/Iswanto25/boilerplate-expressJs](https://github.com/Iswanto25/boilerplate-expressJs)
-- **Issues**: [Report a bug or request a feature](https://github.com/Iswanto25/boilerplate-expressJs/issues)
-- **Pull Requests**: [Contribute to the project](https://github.com/Iswanto25/boilerplate-expressJs/pulls)
-
----
-
-**Happy Coding! 🚀**
+ISC License — Created by [Iswanto25](https://github.com/Iswanto25)

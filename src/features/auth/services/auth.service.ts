@@ -250,13 +250,14 @@ export const authServices = {
 		});
 	},
 
-	async updatePhoto(userId: string, file: Express.Multer.File): Promise<void> {
+	async updatePhoto(userId: string, file: File): Promise<void> {
 		const currentUser = await authRepository.findUserById(userId);
 		if (!currentUser) throw new apiError(400, "User not found");
 
 		const oldPhotoFileName = currentUser.profile?.photo || undefined;
 
-		const base64Data = `data:${file.mimetype};base64,${file.buffer.toString("base64")}`;
+		const buffer = Buffer.from(await file.arrayBuffer());
+		const base64Data = `data:${file.type};base64,${buffer.toString("base64")}`;
 
 		await authQueue.add("upload-profile-photo", {
 			base64Data,

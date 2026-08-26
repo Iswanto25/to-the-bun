@@ -1,10 +1,15 @@
-import { Router } from "express";
+import { Elysia } from "elysia";
 import { uploadController } from "@/features/upload/controllers/upload.controller.js";
-import { authenticate } from "@/middlewares/authMiddleware.js";
+import { verifyToken } from "@/plugins/auth.plugin.js";
+import { rateLimiter } from "@/plugins/rateLimiter.plugin.js";
 
-const router = Router();
+const protectedRoutes = new Elysia({ name: "upload-protected" })
+	.use(verifyToken)
+	.post("/presigned-url", uploadController.presignedUrl, {
+		beforeHandle: [rateLimiter({ windowInSeconds: 60, maxRequests: 30 })],
+	})
+	.post("/confirm", uploadController.confirm);
 
-router.post("/presigned-url", authenticate.verifyToken, uploadController.presignedUrl);
-router.post("/confirm", authenticate.verifyToken, uploadController.confirm);
+export const uploadRoutes = new Elysia({ prefix: "/upload" }).use(protectedRoutes);
 
-export default router;
+export default uploadRoutes;

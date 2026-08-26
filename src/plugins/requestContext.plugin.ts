@@ -1,4 +1,4 @@
-import { Request, Response, NextFunction } from "express";
+import { Elysia } from "elysia";
 import crypto from "node:crypto";
 
 const SENSITIVE_FIELDS =
@@ -6,23 +6,18 @@ const SENSITIVE_FIELDS =
 const BASE64_PREFIX = /^data:image\/[a-z]+;base64,/;
 const MAX_BASE64_SHOWN = 60;
 
-declare module "express-serve-static-core" {
-	interface Request {
-		reqId: string;
-		rawBody?: unknown;
-	}
+export interface AuthUser {
+	id: string;
+	email: string;
+	roleId: string;
+	roleName: string;
+	profile: { name: string | null; phone: string | null; address: string | null; photo: string | null; NIK: string | null } | null;
 }
 
-export function requestContext(req: Request, _res: Response, next: NextFunction): void {
-	req.reqId = (req.headers["x-request-id"] as string) || crypto.randomUUID();
-	req.startTime = Date.now();
-
-	if (req.body && typeof req.body === "object" && Object.keys(req.body as object).length > 0) {
-		req.rawBody = maskSensitive(req.body);
-	}
-
-	next();
-}
+export const requestContext = new Elysia({ name: "request-context" }).derive({ as: "global" }, ({ request }) => ({
+	reqId: request.headers.get("x-request-id") || crypto.randomUUID(),
+	startTime: Date.now(),
+}));
 
 export function maskSensitive(data: unknown): unknown {
 	if (typeof data !== "object" || data === null) return data;

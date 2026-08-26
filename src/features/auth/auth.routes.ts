@@ -1,23 +1,37 @@
-import { Router } from "express";
+import { Elysia } from "elysia";
 import { authController } from "@/features/auth/controllers/auth.controller.js";
-import { authenticate } from "@/middlewares/authMiddleware.js";
-import { uploadSinglePhoto } from "@/middlewares/multerMiddleware.js";
+import { verifyToken } from "@/plugins/auth.plugin.js";
+import { rateLimiter } from "@/plugins/rateLimiter.plugin.js";
 
-const router = Router();
+const publicRoutes = new Elysia()
+	.post("/register", authController.register)
+	.post("/login", authController.login)
+	.post("/forgot-password", authController.forgotPassword, {
+		beforeHandle: [rateLimiter({ windowInSeconds: 30, maxRequests: 5 })],
+	})
+	.post("/reset-password", authController.resetPassword, {
+		beforeHandle: [rateLimiter({ windowInSeconds: 30, maxRequests: 5 })],
+	})
+	.post("/send-otp", authController.sendOtp, {
+		beforeHandle: [rateLimiter({ windowInSeconds: 60, maxRequests: 3 })],
+	})
+	.post("/verify-otp", authController.verifyOtp, {
+		beforeHandle: [rateLimiter({ windowInSeconds: 60, maxRequests: 5 })],
+	});
 
-router.post("/register", authController.register);
-router.post("/login", authController.login);
-router.post("/logout", authenticate.verifyToken, authController.logout);
-router.post("/refresh-token", authenticate.verifyToken, authController.refreshToken);
-router.get("/profile", authenticate.verifyToken, authController.profile);
-router.post("/forgot-password", authController.forgotPassword);
-router.post("/reset-password", authController.resetPassword);
-router.post("/send-otp", authController.sendOtp);
-router.post("/verify-otp", authController.verifyOtp);
-router.get("/users", authenticate.verifyToken, authController.getUsers);
-router.patch("/profile", authenticate.verifyToken, authController.updateProfile);
-router.patch("/profile/photo", authenticate.verifyToken, uploadSinglePhoto, authController.updatePhoto);
-router.patch("/profile/photo/direct", authenticate.verifyToken, authController.updatePhotoDirect);
-router.delete("/profile/:id", authenticate.verifyToken, authController.deleteProfile);
+const protectedRoutes = new Elysia({ name: "auth-protected" })
+	.use(verifyToken)
+	.post("/logout", authController.logout)
+	.post("/refresh-token", authController.refreshToken)
+	.get("/profile", authController.profile, {
+		beforeHandle: [rateLimiter({ windowInSeconds: 30, maxRequests: 3, useUserId: true })],
+	})
+	.get("/users", authController.getUsers)
+	.patch("/profile", authController.updateProfile)
+	.patch("/profile/photo", authController.updatePhoto)
+	.patch("/profile/photo/direct", authController.updatePhotoDirect)
+	.delete("/profile/:id", authController.deleteProfile);
 
-export default router;
+export const authRoutes = new Elysia({ prefix: "/auth" }).use(publicRoutes).use(protectedRoutes);
+
+export default authRoutes;

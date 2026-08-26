@@ -8,7 +8,6 @@ import {
 	ListObjectsV2Command,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
-import fs from "node:fs";
 import path from "node:path";
 import { randomString } from "@/utils/utils.js";
 import { logger } from "@/utils/logger.js";
@@ -140,31 +139,43 @@ export async function headFile(folder: string, file: string) {
 	}
 }
 
-export async function uploadFile(file: Express.Multer.File, folder: string) {
+export async function uploadFile(file: { originalname: string; mimetype: string; path?: string; buffer?: Buffer }, folder: string) {
 	if (!s3Holder.client) throwS3NotConfigured();
 	const s3 = s3Holder.client;
 
 	const fileExtension = path.extname(file.originalname) || "";
 	const fileName = `${randomString()}${fileExtension}`;
 	const key = `${folder}/${fileName}`;
-	const stream = fs.createReadStream(file.path);
+
+	let body: Buffer;
+	if (file.path) {
+		const fileBuffer = await Bun.file(file.path).arrayBuffer();
+		body = Buffer.from(fileBuffer);
+	} else if (file.buffer) {
+		body = file.buffer;
+	} else {
+		throw new Error("File must have either path or buffer");
+	}
 
 	try {
 		await s3.send(
 			new PutObjectCommand({
 				Bucket: BUCKET,
 				Key: key,
-				Body: stream,
+				Body: body,
 				ContentType: file.mimetype || "application/octet-stream",
 				Metadata: { uploadedBy: "api" },
 			}),
 		);
 		return { fileName, folder };
 	} finally {
-		try {
-			fs.unlinkSync(file.path);
-		} catch {
-			// ignore unlink error
+		if (file.path) {
+			try {
+				await Bun.file(file.path).arrayBuffer(); // check exists
+				Bun.write(file.path, ""); // clear
+			} catch {
+				// ignore
+			}
 		}
 	}
 }

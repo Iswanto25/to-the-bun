@@ -6,6 +6,52 @@ Format mengikuti [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), dan p
 
 ---
 
+## [2.0.0] - 2026-08-26
+
+### 🔄 Changed
+
+- **Framework — Express.js → ElysiaJS**: Migrasi penuh dari Express.js 5 ke **ElysiaJS** (Bun-native web framework). Express, helmet, compression, multer, dan pino-http dihapus.
+- **Server Setup**: `app.ts` dan `dev.ts` menggunakan `app.listen()` alih-alih `http.createServer()` — lebih ringkas dan optimal untuk Bun.
+- **Middleware → Elysia Plugins**: Semua middleware Express dikonversi ke Elysia plugin/derive/hook:
+  - `requestContext.ts` → `requestContext.plugin.ts` (derive global, reqId + startTime)
+  - `authMiddleware.ts` → `auth.plugin.ts` (derive global, verifyToken)
+  - `rbacMiddleware.ts` → `rbac.plugin.ts` (beforeHandle hook, `requirePermission`)
+  - `rateLimiter.ts` → `rateLimiter.plugin.ts` (beforeHandle hook, Redis-based)
+- **Security Headers**: `helmet` dihapus — diganti custom `onRequest` hook yang menambahkan security headers secara manual (CSP, HSTS, X-Frame-Options, dll).
+- **File Upload**: `multer` dihapus — menggunakan native `File` API dari Bun. Controller menerima `ctx.body.photo` sebagai `File` langsung.
+- **Response Helper**: `respons.ts` ditulis ulang — parameter `req: Request, res: Response` diganti `ctx: ResponsCtx` (Elysia context). Fungsi `validateOrThrow` dan `apiError` dipertahankan.
+- **Route Definitions**: Route Express (`Router()`) diganti `new Elysia({ prefix })` dengan `.post()` / `.get()` chaining. Protected routes menggunakan `.use(verifyToken)` sebagai beforeHandle.
+- **Controller Pattern**: Parameter controller berubah dari `(req: Request, res: Response)` menjadi `(ctx: any)`. Input diakses via `ctx.body`, `ctx.query`, `ctx.params`, `ctx.headers`. User diakses via `ctx.user`.
+- **Build Target**: `--target=bun` (sebelumnya `--target=node`) agar optimal untuk runtime Bun.
+- **Password Hashing**: `Bun.password.hash/verify` digunakan langsung dengan bcrypt algorithm. `SALT_ROUNDS` dibatasi 4-31 (Bun requirement).
+- **Database Schema (Prisma)**: `prisma db pull` dari live DB — schema menggunakan `Action` enum (bukan `String[]`), field `number` pada module/resource, index berbeda. Tabel `otp` dihapus (OTP disimpan di Redis).
+
+### ✨ Added
+
+- **Elysia Plugins**: File terpisah di `src/plugins/` untuk requestContext, auth, rbac, dan rateLimiter — modular dan reusable.
+- **`Bun.file()` / `Bun.write()` Type Declarations**: Didefinisikan di `types/bun.d.ts` untuk kompatibilitas TypeScript.
+- **Signature Hook**: `verifyApiKey` diubah dari Express middleware menjadi Elysia beforeHandle hook.
+
+### 🗑️ Removed
+
+- **Express.js**: Framework, `express()` app, `http.createServer()`, Express Router, Express Request/Response types.
+- **helmet**: Security headers ditangani via custom onRequest hook.
+- **compression**: Tidak digunakan di Elysia (handled by Bun runtime).
+- **multer**: File upload menggunakan native `File` API.
+- **pino-http**: Logging request ditangani oleh `respons.success`/`respons.error`.
+- **multerMiddleware.ts**: Seluruh file dihapus.
+- **rateLimiter.ts** (old): Diganti `rateLimiter.plugin.ts`.
+- **Otp Repository Methods**: `deactivateOtpsByEmail`, `createOtp`, `findActiveOtp`, `useOtp` dihapus dari auth.repository.ts (dead code — OTP stored in Redis).
+
+### 🔧 Fixed
+
+- **Type Errors**: Seluruh error tipe Express (`Request`, `Response`, `NextFunction`, `Express.Multer.File`) dihapus dan diganti tipe Elysia.
+- **Build**: `bun run build` berhasil tanpa error.
+- **Typecheck**: `bun run typecheck` (`tsc --noEmit`) berhasil tanpa error.
+- **Health Check**: Endpoint `GET /health` berfungsi dengan format response identik.
+
+---
+
 ## [1.0.0] - 2026-07-22
 
 ### ✨ Added

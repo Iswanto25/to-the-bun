@@ -1,7 +1,7 @@
-import { Request, Response, NextFunction } from "express";
-import { redisState } from "@/configs/redis.js";
-import { HttpStatus, respons } from "@/utils/respons.js";
 import { logger } from "@/utils/logger.js";
+import { HttpStatus, respons } from "@/utils/respons.js";
+import { redisState } from "@/configs/redis.js";
+import type { AuthUser } from "@/plugins/requestContext.plugin.js";
 
 interface RateLimitOptions {
 	keyPrefix?: string;
@@ -11,18 +11,25 @@ interface RateLimitOptions {
 	useUserId?: boolean;
 }
 
+/**
+ * Hook beforeHandle rate limiting berbasis Redis.
+ * Pemakaian: .get("/profile", handler, { beforeHandle: [rateLimiter({ windowInSeconds: 30, maxRequests: 3 })] })
+ */
 export function rateLimiter(options?: RateLimitOptions) {
 	const { keyPrefix = "rate_limit:", windowInSeconds = 60, maxRequests = 30, blockDuration = 60, useUserId = true } = options || {};
 
-	return async function rateLimiter(req: Request, res: Response, next: NextFunction) {
+	return async (ctx: any) => {
 		if (!redisState.isAvailable || !redisState.client) {
 			logger.warn("Rate limiting skipped - Redis not available");
-			return next();
+			return;
 		}
 
 		try {
-			const userId = useUserId && req.user?.id ? req.user.id : null;
-			const ip = req.headers["x-forwarded-for"]?.toString().split(",")[0].trim() || req.socket.remoteAddress || "unknown";
+			const user = ctx.user as AuthUser | undefined;
+			const userId = useUserId && user?.id ? user.id : null;
+			const forwarded = ctx.request?.headers?.get("x-forwarded-for");
+			const ip =
+				forwarded?.split(",")[0].trim() || ctx.server?.requestIP(ctx.request)?.address || "unknown";
 
 			const keyId = userId || ip;
 			const key = `${keyPrefix}${keyId}`;
@@ -42,15 +49,11 @@ export function rateLimiter(options?: RateLimitOptions) {
 					"Terlalu banyak permintaan",
 					`Terlalu banyak permintaan. Coba lagi dalam ${ttl} detik.`,
 					HttpStatus.TOO_MANY_REQUESTS,
-					res,
-					req,
+					ctx,
 				);
 			}
-
-			next();
 		} catch (error) {
 			logger.warn({ error }, "Rate limiter error - skipping rate limit");
-			next();
 		}
 	};
 }

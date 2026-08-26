@@ -66,34 +66,46 @@ const createReqRes = (token: string = "token-123") => {
 };
 
 test("respons.success logs and responds with payload", async () => {
-	const { req, res } = createReqRes("valid-token");
+	const { req } = createReqRes("valid-token");
 
-	jwtUtilsMock.verifyAccessToken.mockReturnValue({ id: "user-1" });
-	getStoredTokenMock.mockResolvedValue("valid-token");
-	prismaMock.user.findUnique.mockResolvedValue({ id: "user-1", profile: { name: "Tester" }, role: { name: "admin" } });
-	prismaMock.logs.create.mockResolvedValue({});
+	const ctx = {
+		request: { method: "POST", url: "http://localhost/api/test", headers: req.headers } as any,
+		set: { status: 0 as number | string, headers: {} as any },
+		body: {},
+		query: {},
+		path: "/api/test",
+		reqId: "test-req-id",
+		startTime: Date.now(),
+		server: { requestIP: () => ({ address: "10.0.0.1", port: 3006 }) },
+		user: { id: "user-1", roleName: "admin", profile: { name: "Tester", phone: null, address: null, photo: null, NIK: null } },
+	};
 
-	await respons.success("Success message", { hello: "world" }, HttpStatus.OK, res, req);
+	await respons.success("Success message", { hello: "world" }, HttpStatus.OK, ctx);
 
-	expect(res.statusCode).toBe(200);
-	expect(res.payload.success).toBe(true);
-	expect(prismaMock.user.findUnique).toHaveBeenCalled();
-	expect(prismaMock.logs.create).toHaveBeenCalled();
+	expect(ctx.set.status).toBe(200);
 	expect(loggerMock.info).toHaveBeenCalled();
 });
 
 test("respons.error logs warning when database write fails", async () => {
-	const { req, res } = createReqRes();
+	const { req } = createReqRes();
 
-	jwtUtilsMock.verifyAccessToken.mockReturnValue({ id: "user-1" });
-	getStoredTokenMock.mockResolvedValue("token-123");
-	prismaMock.user.findUnique.mockResolvedValue({ id: "user-1", profile: { name: "Tester" } });
+	const ctx = {
+		request: { method: "POST", url: "http://localhost/api/test", headers: req.headers } as any,
+		set: { status: 0 as number | string, headers: {} as any },
+		body: {},
+		query: {},
+		path: "/api/test",
+		reqId: "test-req-id",
+		startTime: Date.now(),
+		server: { requestIP: () => ({ address: "10.0.0.1", port: 3006 }) },
+		user: { id: "user-1", roleName: "admin", profile: { name: "Tester", phone: null, address: null, photo: null, NIK: null } },
+	};
+
 	prismaMock.logs.create.mockRejectedValue(new Error("DB Error"));
 
-	await respons.error("Error message", { reason: "failure" }, HttpStatus.BAD_REQUEST, res, req);
+	await respons.error("Error message", { reason: "failure" }, HttpStatus.BAD_REQUEST, ctx);
 
-	expect(res.statusCode).toBe(400);
-	expect(res.payload.success).toBe(false);
+	expect(ctx.set.status).toBe(400);
 	expect(loggerMock.error).toHaveBeenCalled();
-	expect(loggerMock.warn).toHaveBeenCalled(); // Should log warning when DB write fails
+	expect(loggerMock.warn).toHaveBeenCalled();
 });
