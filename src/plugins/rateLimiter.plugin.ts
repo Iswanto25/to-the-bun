@@ -11,10 +11,6 @@ interface RateLimitOptions {
 	useUserId?: boolean;
 }
 
-/**
- * Hook beforeHandle rate limiting berbasis Redis.
- * Pemakaian: .get("/profile", handler, { beforeHandle: [rateLimiter({ windowInSeconds: 30, maxRequests: 3 })] })
- */
 export function rateLimiter(options?: RateLimitOptions) {
 	const { keyPrefix = "rate_limit:", windowInSeconds = 60, maxRequests = 30, blockDuration = 60, useUserId = true } = options || {};
 

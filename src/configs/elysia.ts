@@ -21,7 +21,6 @@ function translateMessage(message: string): string {
 }
 
 export const app = new Elysia({ name: "boilerplate-bun-elysia" })
-	// Security headers (pengganti helmet)
 	.onRequest(({ set }) => {
 		set.headers["Content-Security-Policy"] =
 			"default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'; script-src-attr 'none'; upgrade-insecure-requests";

@@ -42,13 +42,13 @@ Setiap fitur (misal: `auth`) memiliki ekosistem sendiri: controller, service, re
 
 | Layer       | Tech                                                                |
 | ----------- | ------------------------------------------------------------------- |
-| Runtime     | **Bun** (v1.x)                                                      |
+| Runtime     | **Bun** (v1.4+)                                                     |
 | Framework   | **ElysiaJS** (Bun-native)                                           |
 | Language    | TypeScript (ESM, bundler)                                           |
 | ORM         | Prisma v7 + PostgreSQL (pg Pool adapter) + Seed di prisma.config.ts |
-| Cache/Queue | Redis (ioredis) + BullMQ                                            |
+| Cache/Queue | Redis (Bun.RedisClient) + BullMQ                                    |
 | Auth        | JWT (access 15m, refresh 7d) + token store in Redis                 |
-| Storage     | MinIO/S3 via @aws-sdk                                               |
+| Storage     | MinIO/S3 via Bun.S3Client                                           |
 | Logger      | Pino (centralized via response helper, pino-http removed)           |
 | Test        | **Bun test runner** (`bun test`)                                    |
 | Container   | Docker multi-stage                                                  |
@@ -102,10 +102,10 @@ src/
     ├── mail.ts                     # HTML email templates
     ├── pagination.ts               # Pagination helper
     ├── respons.ts                  # respons.success/error + apiError class
-    ├── s3.ts                       # S3/MinIO helpers
+    ├── s3.ts                       # S3/MinIO helpers (Bun.S3Client)
     ├── signature.ts                # HMAC-SHA256 API key verification
     ├── smtp.ts                     # Nodemailer SMTP sender
-    ├── tokenStore.ts               # Redis token CRUD
+    ├── tokenStore.ts               # Redis token CRUD (Bun.RedisClient)
     └── utils.ts                    # Password hashing, email/phone validation, OTP, pLimit
 ```
 
@@ -382,20 +382,21 @@ bun run test:infra
 
 ### Core
 
-- **bun** (v1.x) — Runtime & package manager
+- **bun** (v1.4+) — Runtime & package manager
 - **elysia** (v1.4.x) — Web framework (Bun-native)
 - **@elysiajs/cors** (v1.4.x) — CORS handling
 - **typescript** (v5.9.x) — Type safety
 - **@prisma/client** (v7.x) — Database ORM (pg Pool adapter)
 - **zod** (v4.x) — Schema validation
 - **bullmq** (v5.x) — Background jobs
-- **ioredis** (v5.x) — Redis client
 - **jsonwebtoken** (v9.x) — JWT authentication
 
-### File Handling
+### Bun Native APIs
 
-- **@aws-sdk/client-s3** (v3.x) — S3 integration
-- **@aws-sdk/s3-request-presigner** (v3.x) — S3 presigned URLs
+- **Bun.S3Client** — S3/MinIO object storage (upload, delete, presign, stat, list)
+- **Bun.RedisClient** — Redis client (get, set, del, incr, expire, ttl)
+- **Bun.write()** — File write operations
+- **Bun.file()** — File read operations
 
 ### Utilities
 

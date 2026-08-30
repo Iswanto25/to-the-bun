@@ -11,33 +11,25 @@ interface UserData {
 	NIK: string;
 }
 
-/**
- * Generate unique user registration data
- * @param count - Number of users to generate
- * @returns Array of user registration data
- */
 const generateUserData = (count: number): UserData[] => {
 	const users: UserData[] = [];
 	const usedEmails = new Set<string>();
 
-	// Sample base64 image (1x1 pixel JPEG)
 	const base64Photo =
 		"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/2wBDAQkJCQwLDBgNDRgyIRwhMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjL/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAr/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCwAA8A/9k=";
 
 	let attempts = 0;
-	const maxAttempts = count * 2; // Prevent infinite loop
+	const maxAttempts = count * 2;
 
 	while (users.length < count && attempts < maxAttempts) {
 		attempts++;
 
-		// Generate unique email
 		const firstName = faker.person.firstName();
 		const lastName = faker.person.lastName();
 		const randomNum = faker.number.int({ min: 100, max: 9999 });
 		const email = `${firstName.toLowerCase()}.${lastName.toLowerCase()}${randomNum}@example.com`;
 		const NIK = faker.string.numeric(16);
 
-		// Skip if email already exists
 		if (usedEmails.has(email)) {
 			continue;
 		}
@@ -58,9 +50,6 @@ const generateUserData = (count: number): UserData[] => {
 	return users;
 };
 
-/**
- * Generate and save user data to JSON file
- */
 const main = async () => {
 	const COUNT = 1000;
 
@@ -80,7 +69,6 @@ const main = async () => {
 	console.info(JSON.stringify(users.slice(0, 3), null, 2));
 };
 
-// Run if executed directly
 if (import.meta.main) {
 	main();
 }

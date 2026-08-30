@@ -1,6 +1,5 @@
 import { logger } from "@/utils/logger.js";
 
-// Import all workers here
 import "@/features/auth/jobs/auth.jobs.js";
 
 logger.info("All workers started and listening for jobs...");

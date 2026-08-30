@@ -1,7 +1,7 @@
 {
 	"name": "boilerplate-bun-elysia",
 	"version": "1.0.0",
-	"description": "Bun + ElysiaJS backend boilerplate with RBAC, JWT auth, BullMQ jobs, S3 upload",
+	"description": "Bun + ElysiaJS backend boilerplate with RBAC, JWT auth, BullMQ jobs, Bun-native S3 & Redis",
 	"main": "app.ts",
 	"type": "module",
 	"scripts": {

@@ -8,9 +8,7 @@ let sslConfig: { rejectUnauthorized: boolean } | undefined = undefined;
 
 if (connectionString.includes("sslmode=")) {
 	sslConfig = { rejectUnauthorized: false };
-	// Remove sslmode query param so it does not override Node Pool ssl config
 	connectionString = connectionString.replace(/([&?])sslmode=[^&]*/, "");
-	// Cleanup dangling ? or &
 	connectionString = connectionString.replace(/\?&/, "?").replace(/[?&]$/, "");
 }
 

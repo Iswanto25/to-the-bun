@@ -2,7 +2,6 @@ import { app } from "@/configs/elysia.js";
 import { logger, closeLogger } from "@/utils/logger.js";
 import { checkServicesHealth } from "@/utils/healthCheck.js";
 
-// Start worker
 import "@/features/auth/jobs/auth.jobs.js";
 
 const PORT = Number(Bun.env.PORT) || 3006;

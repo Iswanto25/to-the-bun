@@ -20,7 +20,7 @@ function normalizeEndpoint(raw?: string, useSSL?: boolean, port?: string): strin
 				while (e.endsWith("/")) e = e.slice(0, -1);
 			}
 		} catch {
-			// ignore URL parsing errors
+			void 0;
 		}
 	}
 	return e;
@@ -156,42 +156,30 @@ export async function uploadFile(file: { originalname: string; mimetype: string;
 			try {
 				await Bun.file(file.path).delete();
 			} catch {
-				// ignore
+				void 0;
 			}
 		}
 	}
 }
 
-// ─── helpers for uploadBase64 (extracted to reduce cognitive complexity) ─────
-
-/** Strip ASCII whitespace from a string without using regex (ReDoS-safe). */
 function stripAsciiWhitespace(s: string): string {
 	const chars: string[] = [];
 	for (let i = 0; i < s.length; i++) {
 		const cp = s.codePointAt(i) ?? -1;
-		// space=32, tab=9, LF=10, CR=13
 		if (cp !== 32 && cp !== 9 && cp !== 10 && cp !== 13) chars.push(s[i]);
 	}
 	return chars.join("");
 }
 
-/** Returns true when every character is a valid base64 character (ReDoS-safe). */
 function isValidBase64String(s: string): boolean {
 	for (let i = 0; i < s.length; i++) {
 		const cp = s.codePointAt(i) ?? -1;
-		const valid =
-			(cp >= 65 && cp <= 90) || // A-Z
-			(cp >= 97 && cp <= 122) || // a-z
-			(cp >= 48 && cp <= 57) || // 0-9
-			cp === 43 || // +
-			cp === 47 || // /
-			cp === 61; // =
+		const valid = (cp >= 65 && cp <= 90) || (cp >= 97 && cp <= 122) || (cp >= 48 && cp <= 57) || cp === 43 || cp === 47 || cp === 61;
 		if (!valid) return false;
 	}
 	return true;
 }
 
-/** Parses raw input into { mimeType, base64Data }. Throws on invalid base64. */
 function parseBase64Input(raw: string): { mimeType: string; base64Data: string } {
 	const DATA_URI_PREFIX = "data:";
 	const BASE64_MARKER = ";base64,";
@@ -218,8 +206,6 @@ function parseBase64Input(raw: string): { mimeType: string; base64Data: string }
 	}
 	return { mimeType: "image/jpeg", base64Data: sanitized };
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
 
 export async function uploadBase64(folder: string, file: string, maxSizeInMB: number = 10, allowedFormats?: string[]) {
 	if (!s3Holder.client) throwS3NotConfigured();

@@ -5,16 +5,11 @@ interface EmailTemplateOptions {
 	greeting?: string;
 	mainMessage: string;
 	additionalInfo?: string;
-	actionContent?: string; // For OTP box or buttons
+	actionContent?: string;
 	warningMessage?: string;
 	footerMessage?: string;
 }
 
-/**
- * Generate a professional email HTML template
- * @param options - Email template configuration
- * @returns HTML string
- */
 export function generateEmailTemplate(options: EmailTemplateOptions): string {
 	const {
 		userName = "User",
@@ -131,9 +126,6 @@ export function generateEmailTemplate(options: EmailTemplateOptions): string {
 `;
 }
 
-/**
- * Generate OTP email template for password reset
- */
 export function generateOTPEmail(userName: string, otp: string): string {
 	return generateEmailTemplate({
 		userName,
@@ -145,9 +137,6 @@ export function generateOTPEmail(userName: string, otp: string): string {
 	});
 }
 
-/**
- * Generate verification email template
- */
 export function generateVerificationEmail(userName: string, verificationCode: string): string {
 	return generateEmailTemplate({
 		userName,
@@ -158,9 +147,6 @@ export function generateVerificationEmail(userName: string, verificationCode: st
 	});
 }
 
-/**
- * Generate welcome email template
- */
 export function generateWelcomeEmail(userName: string): string {
 	return generateEmailTemplate({
 		userName,
@@ -171,9 +157,6 @@ export function generateWelcomeEmail(userName: string): string {
 	});
 }
 
-/**
- * Generate password change confirmation email
- */
 export function generatePasswordChangedEmail(userName: string): string {
 	return generateEmailTemplate({
 		userName,
@@ -184,9 +167,6 @@ export function generatePasswordChangedEmail(userName: string): string {
 	});
 }
 
-/**
- * Generate reset password email with link
- */
 export function generateResetPasswordEmail(userName: string, resetLink: string): string {
 	return generateEmailTemplate({
 		userName,
@@ -198,9 +178,6 @@ export function generateResetPasswordEmail(userName: string, resetLink: string):
 	});
 }
 
-/**
- * Generate generic OTP email (for various purposes)
- */
 export function generateGenericOTPEmail(options: { userName: string; otp: string; purpose: string; expiryMinutes?: number }): string {
 	const { userName, otp, purpose, expiryMinutes = 10 } = options;
 

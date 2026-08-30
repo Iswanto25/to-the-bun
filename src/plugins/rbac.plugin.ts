@@ -3,10 +3,6 @@ import prisma from "@/configs/database.js";
 import { HttpStatus, respons } from "@/utils/respons.js";
 import type { Action } from "@prisma/client";
 
-/**
- * Hook beforeHandle untuk cek permission RBAC.
- * Pemakaian: .get("/users", handler, { beforeHandle: [requirePermission("User", "LIST")] })
- */
 export const requirePermission = (resourceName: string, action: string) => {
 	return async (ctx: any) => {
 		try {

@@ -46,7 +46,6 @@ export async function comparePassword(password: string, hash: string): Promise<b
 }
 
 export function isEmailValid(email: string): boolean {
-	// Pure string-based check — no regex, no backtracking risk (ReDoS-safe)
 	const atIndex = email.indexOf("@");
 	if (atIndex <= 0 || atIndex !== email.lastIndexOf("@")) return false;
 
@@ -66,11 +65,10 @@ export function isEmailValid(email: string): boolean {
 }
 
 export function isPhoneNumberValid(phoneNumber: string): boolean {
-	// Pure length + charCode check — no regex, guaranteed O(n), ReDoS-safe
 	if (phoneNumber.length < 10 || phoneNumber.length > 15) return false;
 	for (let i = 0; i < phoneNumber.length; i++) {
 		const code = phoneNumber.codePointAt(i) ?? -1;
-		if (code < 48 || code > 57) return false; // '0'–'9'
+		if (code < 48 || code > 57) return false;
 	}
 	return true;
 }
@@ -79,9 +77,6 @@ export function generateOTP(): string {
 	return crypto.randomInt(100000, 999999).toString();
 }
 
-/**
- * Native concurrency limiter to replace 'p-limit' dependency (ESM issues with Jest)
- */
 export function pLimit(concurrency: number) {
 	const queue: (() => void)[] = [];
 	let activeCount = 0;

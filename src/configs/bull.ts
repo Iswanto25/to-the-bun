@@ -5,5 +5,5 @@ export const bullConnection: ConnectionOptions = {
 	port: Number(Bun.env.REDIS_PORT) || 6379,
 	password: Bun.env.REDIS_PASSWORD || undefined,
 	db: Number(Bun.env.REDIS_DB) || 0,
-	maxRetriesPerRequest: null, // Required for BullMQ
+	maxRetriesPerRequest: null,
 };
