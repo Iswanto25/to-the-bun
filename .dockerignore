@@ -1,8 +1,6 @@
 # Dependencies
 node_modules
-npm-debug.log
-yarn-error.log
-yarn.lock
+bun.lock
 
 # Build outputs
 dist
@@ -71,7 +69,7 @@ temp/
 # Scripts (not needed in production)
 scripts/cleanup-boilerplate.sh
 scripts/generateApiKey.ts
-scripts/prepare-test-env.cjs
+scripts/prepare-test-env.ts
 
 # Generated files
 test_data.json
@@ -82,3 +80,4 @@ ADD_*.ts
 .eslintrc*
 .prettierrc*
 .editorconfig
+eslint.config.mjs

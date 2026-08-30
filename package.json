@@ -2,7 +2,7 @@
 	"name": "boilerplate-bun-elysia",
 	"version": "1.0.0",
 	"description": "Bun + ElysiaJS backend boilerplate with RBAC, JWT auth, BullMQ jobs, Bun-native S3 & Redis",
-	"main": "app.ts",
+	"main": "src/app.ts",
 	"type": "module",
 	"scripts": {
 		"prettier": "prettier . --write",

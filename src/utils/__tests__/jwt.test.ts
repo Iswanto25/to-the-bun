@@ -1,57 +1,67 @@
-import { test, expect } from "bun:test";
-import { createRequire } from "node:module";
+import { test, expect, mock } from "bun:test";
 
-const requireModule = createRequire(__filename);
-const modulePath = "@/utils/jwt";
+const signMock = mock(() => "mock-jwt-token");
+const verifyMock = mock(() => ({ id: "user-1", role: "admin" }));
 
-const reloadJwtModule = async () => {
-	delete requireModule.cache[requireModule.resolve(modulePath)];
-	return import(modulePath);
-};
+mock.module("jsonwebtoken", () => ({
+	default: {
+		sign: signMock,
+		verify: verifyMock,
+	},
+}));
 
-const setSecrets = (access?: string, refresh?: string) => {
-	if (access) {
-		process.env.JWT_SECRET = access;
-	} else {
-		delete process.env.JWT_SECRET;
-	}
+process.env.JWT_SECRET = "test-secret";
+process.env.JWT_REFRESH_SECRET = "test-refresh-secret";
 
-	if (refresh) {
-		process.env.JWT_REFRESH_SECRET = refresh;
-	} else {
-		delete process.env.JWT_REFRESH_SECRET;
-	}
-};
+const { jwtUtils } = await import("@/utils/jwt.js");
 
-test("jwtUtils signs and verifies tokens with configured secrets", async () => {
-	setSecrets("unit-test-secret", "unit-test-refresh");
+test("jwtUtils.generateAccessToken calls jwt.sign with correct args", () => {
+	signMock.mockClear();
+	signMock.mockReturnValue("access-token-123");
 
-	const { jwtUtils } = await reloadJwtModule();
 	const payload = { id: "user-1", role: "admin" };
+	const token = jwtUtils.generateAccessToken(payload);
 
-	const accessToken = jwtUtils.generateAccessToken(payload);
-	const refreshToken = jwtUtils.generateRefreshToken(payload);
-
-	expect(typeof accessToken === "string" && accessToken.length > 0).toBeTruthy();
-	expect(typeof refreshToken === "string" && refreshToken.length > 0).toBeTruthy();
-
-	const verifiedAccess = jwtUtils.verifyAccessToken(accessToken);
-	const verifiedRefresh = jwtUtils.verifyRefreshToken(refreshToken);
-
-	expect(verifiedAccess.id).toBe(payload.id);
-	expect(verifiedRefresh.role).toBe(payload.role);
+	expect(token).toBe("access-token-123");
+	expect(signMock).toHaveBeenCalledWith(payload, "test-secret", { expiresIn: "1d" });
 });
 
-test("generateAccessToken throws when secret is missing", async () => {
-	setSecrets(undefined, "unit-test-refresh");
-	const { jwtUtils } = await reloadJwtModule();
+test("jwtUtils.generateRefreshToken calls jwt.sign with refresh secret", () => {
+	signMock.mockClear();
+	signMock.mockReturnValue("refresh-token-456");
 
-	expect(() => jwtUtils.generateAccessToken({})).toThrow(/secretOrPrivateKey must have a value/);
+	const payload = { id: "user-1" };
+	const token = jwtUtils.generateRefreshToken(payload);
+
+	expect(token).toBe("refresh-token-456");
+	expect(signMock).toHaveBeenCalledWith(payload, "test-refresh-secret", { expiresIn: "7d" });
 });
 
-test("verifyAccessToken rejects malformed tokens", async () => {
-	setSecrets("unit-test-secret", "unit-test-refresh");
-	const { jwtUtils } = await reloadJwtModule();
+test("jwtUtils.verifyAccessToken calls jwt.verify with correct secret", () => {
+	verifyMock.mockClear();
+	verifyMock.mockReturnValue({ id: "user-1", role: "admin" });
 
-	expect(() => jwtUtils.verifyAccessToken("invalid")).toThrow(/jwt malformed/);
+	const result = jwtUtils.verifyAccessToken("some-token");
+
+	expect(result).toEqual({ id: "user-1", role: "admin" });
+	expect(verifyMock).toHaveBeenCalledWith("some-token", "test-secret");
+});
+
+test("jwtUtils.verifyRefreshToken calls jwt.verify with refresh secret", () => {
+	verifyMock.mockClear();
+	verifyMock.mockReturnValue({ id: "user-1", role: "user" });
+
+	const result = jwtUtils.verifyRefreshToken("refresh-token");
+
+	expect(result).toEqual({ id: "user-1", role: "user" });
+	expect(verifyMock).toHaveBeenCalledWith("refresh-token", "test-refresh-secret");
+});
+
+test("jwtUtils.verifyAccessToken throws on invalid token", () => {
+	verifyMock.mockClear();
+	verifyMock.mockImplementation(() => {
+		throw new Error("jwt malformed");
+	});
+
+	expect(() => jwtUtils.verifyAccessToken("invalid")).toThrow("jwt malformed");
 });

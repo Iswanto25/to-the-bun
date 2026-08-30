@@ -1,7 +1,7 @@
 services:
-    boilerplate-express-worker:
-        image: boilerplate-express-backend:latest
-        container_name: boilerplate-express-worker
+    boilerplate-bun-elysia-worker:
+        image: boilerplate-bun-elysia:latest
+        container_name: boilerplate-bun-elysia-worker
         env_file:
             - .env
         environment:

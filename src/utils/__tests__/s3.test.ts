@@ -24,14 +24,16 @@ const listMock = mock(async () => ({
 	contents: [],
 }));
 
-mock.module("bun", () => ({
-	S3Client: class {
-		constructor() {}
-		static presign = presignMock;
-		static list = listMock;
-		file = mockFile;
-		presign = presignMock;
-	},
+class MockS3Client {
+	constructor() {}
+	static presign = presignMock;
+	static list = listMock;
+	file(_key: string) { return mockFile; }
+	presign = presignMock;
+}
+
+mock.module("@/configs/s3Client.js", () => ({
+	S3Client: MockS3Client,
 }));
 
 const setup = async () => {

@@ -1,16 +1,15 @@
 import crypto from "node:crypto";
 import { HttpStatus, respons } from "@/utils/respons.js";
 
-function timeFormater(): string {
-	const now = new Date();
-	const wibOffset = 7 * 60 * 60 * 1000;
-	const wibTime = new Date(now.getTime() + now.getTimezoneOffset() * 60 * 1000 + wibOffset);
-	return wibTime.getTime().toString();
+const UTC7_OFFSET_MS = 7 * 60 * 60 * 1000;
+
+function utc7Now(): number {
+	return Date.now() + UTC7_OFFSET_MS;
 }
 
 export async function generateApiKey(userKey: string, secretKey: string): Promise<string> {
 	const isProd = Bun.env.NODE_ENV === "production";
-	const timestamp = timeFormater();
+	const timestamp = utc7Now().toString();
 
 	if (!isProd) {
 		const payload = `${userKey}:${secretKey}`;
@@ -55,8 +54,8 @@ export function verifyApiKey(ctx: any) {
 			return respons.error("Identitas tidak valid", "Unauthorized", HttpStatus.UNAUTHORIZED, ctx);
 		}
 
-		const requestTime = parseInt(timestamp);
-		const currentTime = parseInt(timeFormater());
+		const requestTime = parseInt(timestamp, 10);
+		const currentTime = utc7Now();
 		const timeDiff = Math.abs(currentTime - requestTime);
 		const maxAge = 5 * 60 * 1000;
 

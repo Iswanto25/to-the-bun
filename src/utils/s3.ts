@@ -1,4 +1,4 @@
-import { S3Client } from "bun";
+import { S3Client } from "@/configs/s3Client.js";
 import path from "node:path";
 import { randomString } from "@/utils/utils.js";
 import { logger } from "@/utils/logger.js";

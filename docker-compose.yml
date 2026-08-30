@@ -1,14 +1,14 @@
 services:
-    boilerplate-express-backend:
-        image: boilerplate-express-backend:1.0.0
-        container_name: boilerplate-express-backend
+    boilerplate-bun-elysia:
+        image: boilerplate-bun-elysia:1.0.0
+        container_name: boilerplate-bun-elysia
         build:
             context: .
             dockerfile: Dockerfile
         env_file:
             - .env
         volumes:
-            - boilerplate-express-backend_logs:/app/logger
+            - boilerplate-bun-elysia_logs:/app/logger
             - uploads_data:/app/uploads
         environment:
             DOCKER_ENV: "true"
@@ -48,6 +48,5 @@ services:
         restart: unless-stopped
 
 volumes:
-    boilerplate-express-backend_logs:
+    boilerplate-bun-elysia_logs:
     uploads_data:
-    logger_data:
