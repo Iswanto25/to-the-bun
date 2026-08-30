@@ -27,8 +27,8 @@ export function formatDateTime(date: Date = new Date()): string {
 	return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
 }
 
-const saltHast = process.env.SALT_HASH || "default";
-const saltRounds = Math.min(31, Math.max(4, Number(process.env.SALT_ROUNDS) || 10));
+const saltHast = Bun.env.SALT_HASH || "default";
+const saltRounds = Math.min(31, Math.max(4, Number(Bun.env.SALT_ROUNDS) || 10));
 
 export function randomString(): string {
 	const datePart = formatDate();

@@ -9,7 +9,7 @@ interface SendEmailOptions {
 	fromEmail?: string;
 }
 
-export const isSMTPConfigured = !!(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS);
+export const isSMTPConfigured = !!(Bun.env.SMTP_HOST && Bun.env.SMTP_USER && Bun.env.SMTP_PASS);
 
 if (!isSMTPConfigured) {
 	console.warn("⚠️  SMTP not configured (SMTP_HOST, SMTP_USER, SMTP_PASS) - email sending will be skipped");
@@ -23,16 +23,16 @@ export const sendEmail = async (options: SendEmailOptions): Promise<void> => {
 
 	try {
 		const transporter = nodemailer.createTransport({
-			host: process.env.SMTP_HOST,
-			port: Number(process.env.SMTP_PORT) || 587,
-			secure: process.env.SMTP_SECURE === "true",
+			host: Bun.env.SMTP_HOST,
+			port: Number(Bun.env.SMTP_PORT) || 587,
+			secure: Bun.env.SMTP_SECURE === "true",
 			auth: {
-				user: process.env.SMTP_USER,
-				pass: process.env.SMTP_PASS,
+				user: Bun.env.SMTP_USER,
+				pass: Bun.env.SMTP_PASS,
 			},
 		});
-		const fromAddress = options.fromEmail || process.env.SMTP_FROM || process.env.SMTP_USER;
-		const fromName = options.fromName || process.env.APP_NAME || "Boilerplate App";
+		const fromAddress = options.fromEmail || Bun.env.SMTP_FROM || Bun.env.SMTP_USER;
+		const fromName = options.fromName || Bun.env.APP_NAME || "Boilerplate App";
 		await transporter.sendMail({
 			from: `"${fromName}" <${fromAddress}>`,
 			to: options.to,

@@ -195,7 +195,7 @@ export const authServices = {
 			throw new apiError(503, "Service temporarily unavailable");
 		}
 
-		const frontendUrl = process.env.FRONTEND_URL || process.env.BASE_URL || "http://localhost:3000";
+		const frontendUrl = Bun.env.FRONTEND_URL || Bun.env.BASE_URL || "http://localhost:3000";
 		const resetLink = `${frontendUrl}/reset-password?token=${token}`;
 
 		await authQueue.add("send-forgot-password-email", {

@@ -43,10 +43,10 @@ export const app = new Elysia({ name: "boilerplate-bun-elysia" })
 	.use(requestContext)
 	.use(
 		cors({
-			origin: process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(",").map((origin) => origin.trim()) : true,
+			origin: Bun.env.ALLOWED_ORIGINS ? Bun.env.ALLOWED_ORIGINS.split(",").map((origin) => origin.trim()) : true,
 			methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
 			preflight: true,
-			credentials: !!process.env.ALLOWED_ORIGINS,
+			credentials: !!Bun.env.ALLOWED_ORIGINS,
 		}),
 	)
 	.get("/", ({ redirect }) => redirect("/health"))
@@ -54,14 +54,14 @@ export const app = new Elysia({ name: "boilerplate-bun-elysia" })
 		const data = {
 			status: "ok",
 			timestamp: new Date().toLocaleString("sv-SE", { timeZone: "Asia/Jakarta" }),
-			version: process.env.VERSION || "1.0.0",
-			environment: process.env.NODE_ENV || "development",
+			version: Bun.env.VERSION || "1.0.0",
+			environment: Bun.env.NODE_ENV || "development",
 		};
 		return respons.success("Service is healthy", data, HttpStatus.OK, ctx);
 	})
 	.use(apiRoutes)
 	.onError((ctx) => {
-		const isProduction = process.env.NODE_ENV === "production";
+		const isProduction = Bun.env.NODE_ENV === "production";
 		const { code, error, request, path, set, server } = ctx as any;
 
 		let statusCode = HttpStatus.INTERNAL_SERVER_ERROR;

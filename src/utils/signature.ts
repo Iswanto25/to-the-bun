@@ -33,7 +33,7 @@ export function verifyApiKey(ctx: any) {
 			return respons.error("Format tidak valid", "Unauthorized", HttpStatus.UNAUTHORIZED, ctx);
 		}
 
-		if (userKey !== process.env.USER_KEY) {
+		if (userKey !== Bun.env.USER_KEY) {
 			return respons.error("Identitas tidak valid", "Unauthorized", HttpStatus.UNAUTHORIZED, ctx);
 		}
 
@@ -46,7 +46,7 @@ export function verifyApiKey(ctx: any) {
 			return respons.error("Request expired", "Unauthorized", HttpStatus.UNAUTHORIZED, ctx);
 		}
 
-		const secretKey = process.env.SECRET_KEY;
+		const secretKey = Bun.env.SECRET_KEY;
 		if (!secretKey) {
 			return respons.error("Server configuration error", "Internal Server Error", HttpStatus.INTERNAL_SERVER_ERROR, ctx);
 		}

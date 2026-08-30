@@ -37,13 +37,13 @@ function normalizeEndpoint(raw?: string, useSSL?: boolean, port?: string): strin
 	return e;
 }
 
-const USE_SSL = String(process.env.S3_USE_SSL || "").toLowerCase() === "true";
-const S3_PORT = process.env.S3_PORT?.trim();
-const ENDPOINT = normalizeEndpoint(process.env.S3_ENDPOINT, USE_SSL, S3_PORT);
-const REGION = process.env.S3_REGION?.trim() || "us-east-1";
-const BUCKET = process.env.S3_BUCKET_NAME?.trim();
-const ACCESS_KEY = process.env.S3_ACCESS_KEY?.trim();
-const SECRET_KEY = process.env.S3_SECRET_KEY?.trim();
+const USE_SSL = String(Bun.env.S3_USE_SSL || "").toLowerCase() === "true";
+const S3_PORT = Bun.env.S3_PORT?.trim();
+const ENDPOINT = normalizeEndpoint(Bun.env.S3_ENDPOINT, USE_SSL, S3_PORT);
+const REGION = Bun.env.S3_REGION?.trim() || "us-east-1";
+const BUCKET = Bun.env.S3_BUCKET_NAME?.trim();
+const ACCESS_KEY = Bun.env.S3_ACCESS_KEY?.trim();
+const SECRET_KEY = Bun.env.S3_SECRET_KEY?.trim();
 
 const isS3Configured = !!(ENDPOINT && BUCKET && ACCESS_KEY && SECRET_KEY);
 
@@ -71,8 +71,8 @@ function publicUrl(key: string): string {
 }
 
 export function getPublicUrl(folder: string, file: string): string {
-	const publicBaseUrl = (process.env.STORAGE_PUBLIC_URL || "").replace(/^"|"$/g, "").replace(/\/$/, "");
-	const bucket = (process.env.S3_BUCKET_NAME || "").trim();
+	const publicBaseUrl = (Bun.env.STORAGE_PUBLIC_URL || "").replace(/^"|"$/g, "").replace(/\/$/, "");
+	const bucket = (Bun.env.S3_BUCKET_NAME || "").trim();
 	return `${publicBaseUrl}/${bucket}/${folder}/${file}`;
 }
 
@@ -171,8 +171,7 @@ export async function uploadFile(file: { originalname: string; mimetype: string;
 	} finally {
 		if (file.path) {
 			try {
-				await Bun.file(file.path).arrayBuffer(); // check exists
-				Bun.write(file.path, ""); // clear
+				await Bun.file(file.path).delete();
 			} catch {
 				// ignore
 			}

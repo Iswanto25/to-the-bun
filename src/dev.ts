@@ -5,9 +5,9 @@ import { checkServicesHealth } from "@/utils/healthCheck.js";
 // Start worker
 import "@/features/auth/jobs/auth.jobs.js";
 
-const PORT = Number(process.env.PORT) || 3006;
-const HOST = process.env.HOST || "0.0.0.0";
-const NODE_ENV = process.env.NODE_ENV || "development";
+const PORT = Number(Bun.env.PORT) || 3006;
+const HOST = Bun.env.HOST || "0.0.0.0";
+const NODE_ENV = Bun.env.NODE_ENV || "development";
 
 app.listen(
 	{
@@ -19,7 +19,7 @@ app.listen(
 
 		console.info("========================================");
 		console.info(`Server is running on Bun ${Bun.version}`);
-		console.info(`Version: ${process.env.VERSION || "1.0.0"}`);
+		console.info(`Version: ${Bun.env.VERSION || "1.0.0"}`);
 		console.info(`Environment: ${NODE_ENV}`);
 		console.info(`URL: ${baseUrl}`);
 		console.info("Worker: Running (BullMQ background jobs)");

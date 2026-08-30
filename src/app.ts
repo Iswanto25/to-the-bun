@@ -2,9 +2,9 @@ import { app } from "@/configs/elysia.js";
 import { logger, closeLogger } from "@/utils/logger.js";
 import { checkServicesHealth } from "@/utils/healthCheck.js";
 
-const PORT = Number(process.env.PORT) || 3006;
-const HOST = process.env.HOST || "0.0.0.0";
-const NODE_ENV = process.env.NODE_ENV || "development";
+const PORT = Number(Bun.env.PORT) || 3006;
+const HOST = Bun.env.HOST || "0.0.0.0";
+const NODE_ENV = Bun.env.NODE_ENV || "development";
 const isProd = NODE_ENV === "production";
 
 if (isProd) {
@@ -20,12 +20,12 @@ app.listen(
 	},
 	() => {
 		const baseUrl = isProd
-			? process.env.BASE_URL || `https://${process.env.DOMAIN || "yourdomain.com"}`
+			? Bun.env.BASE_URL || `https://${Bun.env.DOMAIN || "yourdomain.com"}`
 			: `http://${HOST}:${PORT}`;
 
 		console.info("========================================");
 		console.info(`Server is running on Bun ${Bun.version}`);
-		console.info(`Version: ${process.env.VERSION || "1.0.0"}`);
+		console.info(`Version: ${Bun.env.VERSION || "1.0.0"}`);
 		console.info(`Environment: ${NODE_ENV}`);
 		console.info(`URL: ${baseUrl}`);
 		console.info("========================================");

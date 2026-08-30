@@ -9,7 +9,7 @@ let cachedKey: Buffer | null = null;
 const loadKey = (): Buffer => {
 	if (cachedKey) return cachedKey;
 
-	const keySource = process.env.DATA_ENCRYPTION_KEY;
+	const keySource = Bun.env.DATA_ENCRYPTION_KEY;
 	if (!keySource) throw new Error("DATA_ENCRYPTION_KEY is required for encryption");
 
 	let keyBuffer: Buffer;

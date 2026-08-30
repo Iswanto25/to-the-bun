@@ -4,7 +4,7 @@ import { Writable } from "node:stream";
 import pino from "pino";
 import pretty from "pino-pretty";
 
-export const getLogLevel = (env = process.env.NODE_ENV) => (env === "production" ? "info" : "debug");
+export const getLogLevel = (env = Bun.env.NODE_ENV) => (env === "production" ? "info" : "debug");
 
 export function formatIsoWithTz(date: Date = new Date()): string {
 	const pad = (n: number, len = 2) => String(n).padStart(len, "0");
@@ -43,7 +43,7 @@ const prettyStream = pretty({
 
 const consoleStream = new Writable({
 	write(chunk, encoding, callback) {
-		if (process.env.NODE_ENV === "production") {
+		if (Bun.env.NODE_ENV === "production") {
 			process.stdout.write(chunk, encoding, callback);
 		} else {
 			prettyStream.write(chunk, encoding, callback);

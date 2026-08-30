@@ -36,5 +36,9 @@ declare namespace Bun {
 		json(): Promise<any>;
 		arrayBuffer(): Promise<ArrayBuffer>;
 		stream(): ReadableStream;
+		bytes(): Promise<Uint8Array>;
+		writer(params?: { highWaterMark?: number }): FileSink;
+		exists(): Promise<boolean>;
+		delete(): Promise<void>;
 	}
 }

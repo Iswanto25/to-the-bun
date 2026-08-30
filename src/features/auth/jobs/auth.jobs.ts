@@ -52,8 +52,8 @@ export const processForgotPasswordJob = async (data: ForgotPasswordJobData) => {
 		to: data.email,
 		subject: "Reset Password",
 		html,
-		fromName: process.env.APP_NAME,
-		fromEmail: process.env.SMTP_USER,
+		fromName: Bun.env.APP_NAME,
+		fromEmail: Bun.env.SMTP_USER,
 	});
 
 	logger.info({ email: data.email }, "Forgot-password email sent");
@@ -75,8 +75,8 @@ export const processSendOtpJob = async (data: SendOtpJobData) => {
 		to: data.email,
 		subject: `Kode OTP - ${data.purpose}`,
 		html,
-		fromName: process.env.APP_NAME,
-		fromEmail: process.env.SMTP_USER,
+		fromName: Bun.env.APP_NAME,
+		fromEmail: Bun.env.SMTP_USER,
 	});
 
 	logger.info({ email: data.email, purpose: data.purpose }, "OTP email sent");

@@ -18,7 +18,7 @@ interface EmailTemplateOptions {
 export function generateEmailTemplate(options: EmailTemplateOptions): string {
 	const {
 		userName = "User",
-		appName = process.env.APP_NAME || "Our App",
+		appName = Bun.env.APP_NAME || "Our App",
 		title,
 		greeting,
 		mainMessage,
@@ -165,7 +165,7 @@ export function generateWelcomeEmail(userName: string): string {
 	return generateEmailTemplate({
 		userName,
 		title: "Selamat Datang",
-		mainMessage: `Selamat datang di ${process.env.APP_NAME || "aplikasi kami"}!`,
+		mainMessage: `Selamat datang di ${Bun.env.APP_NAME || "aplikasi kami"}!`,
 		additionalInfo: "Akun Anda telah berhasil dibuat. Anda sekarang dapat menggunakan semua fitur yang tersedia.",
 		warningMessage: "Jika Anda mengalami masalah atau memiliki pertanyaan, jangan ragu untuk menghubungi tim support kami.",
 	});

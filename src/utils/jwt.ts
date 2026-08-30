@@ -1,7 +1,7 @@
 import jwt from "jsonwebtoken";
 
-const JWT_SECRET = process.env.JWT_SECRET as string;
-const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET as string;
+const JWT_SECRET = Bun.env.JWT_SECRET as string;
+const JWT_REFRESH_SECRET = Bun.env.JWT_REFRESH_SECRET as string;
 
 export const jwtUtils = {
 	generateAccessToken: (payload: object) => {

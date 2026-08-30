@@ -3,7 +3,7 @@ import { Pool } from "pg";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { logger } from "@/utils/logger.js";
 
-let connectionString = process.env.DATABASE_URL || "";
+let connectionString = Bun.env.DATABASE_URL || "";
 let sslConfig: { rejectUnauthorized: boolean } | undefined = undefined;
 
 if (connectionString.includes("sslmode=")) {

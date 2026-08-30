@@ -6,15 +6,15 @@ const redisState: { client: Redis | null; isAvailable: boolean } = {
 	isAvailable: false,
 };
 
-const hasRedisConfig = !!(process.env.REDIS_HOST || process.env.REDIS_PORT);
+const hasRedisConfig = !!(Bun.env.REDIS_HOST || Bun.env.REDIS_PORT);
 
 if (hasRedisConfig) {
 	try {
 		redisState.client = new Redis({
-			host: process.env.REDIS_HOST || "127.0.0.1",
-			port: Number(process.env.REDIS_PORT) || 6379,
-			password: process.env.REDIS_PASSWORD || undefined,
-			db: Number(process.env.REDIS_DB) || 0,
+			host: Bun.env.REDIS_HOST || "127.0.0.1",
+			port: Number(Bun.env.REDIS_PORT) || 6379,
+			password: Bun.env.REDIS_PASSWORD || undefined,
+			db: Number(Bun.env.REDIS_DB) || 0,
 			connectTimeout: 10_000,
 			retryStrategy: (times: number) => {
 				if (times > 3) {

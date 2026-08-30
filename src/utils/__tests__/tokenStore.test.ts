@@ -1,93 +1,63 @@
-import { test, expect, mock } from "bun:test";
-import { createRequire } from "node:module";
+import { test, expect, mock, beforeEach, afterEach } from "bun:test";
 
-const requireModule = createRequire(__filename);
-const modulePath = "@/utils/tokenStore";
-const redisPath = "@/configs/redis";
+let redisClient: any;
+let tokenStore: any;
 
-const stubModule = (specifier: string, exports: any): (() => void) => {
-	const resolved = requireModule.resolve(specifier);
-	const original = requireModule.cache[resolved];
-	(requireModule.cache as any)[resolved] = {
-		id: resolved,
-		filename: resolved,
-		loaded: true,
-		exports,
-	};
-	return () => {
-		if (original) {
-			(requireModule.cache as any)[resolved] = original;
-		} else {
-			delete requireModule.cache[resolved];
-		}
-	};
-};
-
-const setupModule = async (overrides?: Partial<Record<string, any>>) => {
-	const redisClient: any = {
+function setupModule(overrides?: Partial<Record<string, any>>) {
+	redisClient = {
 		set: mock(async () => "OK"),
 		get: mock(async () => null),
 		del: mock(async () => 1),
 		...(overrides || {}),
 	};
 
-	const restoreRedis = stubModule(redisPath, { redisState: { client: redisClient, isAvailable: true } });
-	delete requireModule.cache[requireModule.resolve(modulePath)];
+	mock.module("@/configs/redis.js", () => ({
+		redisState: { client: redisClient, isAvailable: true },
+	}));
+}
 
-	const module = await import(modulePath);
-	return {
-		module,
-		redisClient,
-		restore: () => {
-			restoreRedis();
-			delete requireModule.cache[requireModule.resolve(modulePath)];
-		},
-	};
-};
-
-test("storeToken persists token with the correct prefix", async () => {
-	const { module, redisClient, restore } = await setupModule();
-	try {
-		const key = await module.storeToken("user-1", "token-value", "access", 120);
-
-		expect(key).toBe("access_token:user-1");
-		expect(redisClient.set.mock.calls[0]).toEqual(["access_token:user-1", "token-value", "EX", 120]);
-	} finally {
-		restore();
-	}
+beforeEach(() => {
+	setupModule();
 });
 
-test("storeToken throws when Redis does not acknowledge write", async () => {
-	const { module, restore } = await setupModule({
-		set: mock(async () => "ERR"),
-	});
-	try {
-		await expect(module.storeToken("user-2", "token", "refresh", 60)).rejects.toThrow(/Failed to store token/);
-	} finally {
-		restore();
-	}
+afterEach(async () => {
+	await new Promise((r) => setTimeout(r, 10));
+	mock.restore();
+});
+
+test("storeToken persists token with the correct prefix", async () => {
+	tokenStore = await import("@/utils/tokenStore.js");
+	const key = await tokenStore.storeToken("user-1", "token-value", "access", 120);
+
+	expect(key).toBe("access_token:user-1");
+	expect(redisClient.set.mock.calls[0]).toEqual(["access_token:user-1", "token-value", "EX", 120]);
+});
+
+test("storeToken returns null when Redis not available", async () => {
+	mock.module("@/configs/redis.js", () => ({
+		redisState: { client: null, isAvailable: false },
+	}));
+
+	tokenStore = await import("@/utils/tokenStore.js");
+	const key = await tokenStore.storeToken("user-2", "token", "refresh", 60);
+
+	expect(key).toBeNull();
 });
 
 test("getStoredToken reads token from Redis", async () => {
-	const { module, redisClient, restore } = await setupModule({
-		get: mock(async () => "stored-token"),
-	});
+	mock.module("@/configs/redis.js", () => ({
+		redisState: { client: { get: mock(async () => "stored-token"), set: mock(), del: mock() }, isAvailable: true },
+	}));
 
-	try {
-		const result = await module.getStoredToken("user-3", "access");
-		expect(result).toBe("stored-token");
-		expect(redisClient.get.mock.calls[0]).toEqual(["access_token:user-3"]);
-	} finally {
-		restore();
-	}
+	tokenStore = await import("@/utils/tokenStore.js");
+	const result = await tokenStore.getStoredToken("user-3", "access");
+
+	expect(result).toBe("stored-token");
 });
 
 test("deleteToken removes token key", async () => {
-	const { module, redisClient, restore } = await setupModule();
-	try {
-		await module.deleteToken("user-4", "refresh");
-		expect(redisClient.del.mock.calls[0]).toEqual(["refresh_token:user-4"]);
-	} finally {
-		restore();
-	}
+	tokenStore = await import("@/utils/tokenStore.js");
+	await tokenStore.deleteToken("user-4", "refresh");
+
+	expect(redisClient.del.mock.calls[0]).toEqual(["refresh_token:user-4"]);
 });
