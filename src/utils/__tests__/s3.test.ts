@@ -28,7 +28,9 @@ class MockS3Client {
 	constructor() {}
 	static presign = presignMock;
 	static list = listMock;
-	file(_key: string) { return mockFile; }
+	file(_key: string) {
+		return mockFile;
+	}
 	presign = presignMock;
 }
 

@@ -11,7 +11,7 @@ function cryptoRandomString(length: number): string {
 }
 
 export function formatDate(date: Date = new Date()): string {
-	const utc7Date = new Date(date.getTime() + (7 * 60 * 60 * 1000));
+	const utc7Date = new Date(date.getTime() + 7 * 60 * 60 * 1000);
 	const year = utc7Date.getUTCFullYear();
 	const month = String(utc7Date.getUTCMonth() + 1).padStart(2, "0");
 	const day = String(utc7Date.getUTCDate()).padStart(2, "0");
@@ -19,7 +19,7 @@ export function formatDate(date: Date = new Date()): string {
 }
 
 export function formatDateTime(date: Date = new Date()): string {
-	const utc7Date = new Date(date.getTime() + (7 * 60 * 60 * 1000));
+	const utc7Date = new Date(date.getTime() + 7 * 60 * 60 * 1000);
 	const year = utc7Date.getUTCFullYear();
 	const month = String(utc7Date.getUTCMonth() + 1).padStart(2, "0");
 	const day = String(utc7Date.getUTCDate()).padStart(2, "0");
