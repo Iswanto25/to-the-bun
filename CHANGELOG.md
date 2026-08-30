@@ -6,6 +6,24 @@ Format mengikuti [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), dan p
 
 ---
 
+## [2.0.1] - 2026-08-30
+
+### 🔄 Changed
+
+- **Bun Upgrade (1.3 → 1.4)**: Runtime diperbarui ke Bun v1.4.0 — Rust rewrite, Node.js 26.3.0 compatibility, lockfile v2, isolasi linker untuk monorepo.
+- **Dockerfile**: Base image diubah dari `oven/bun:1-alpine` ke `oven/bun:1.4-alpine` di semua stage (dependencies, build, production).
+- **README.md**: Dokumentasi diperbarui — port default, environment variables, struktur direktori, tech stack, dan CI/CD section disesuaikan dengan kondisi project saat ini.
+
+### 🗑️ Removed
+
+- **Unused Dependencies**: `@typescript-eslint/eslint-plugin` dan `@typescript-eslint/parser` dihapus dari devDependencies — redundan dengan `typescript-eslint` v8+ yang sudah bundled parser dan plugin internal.
+
+### ✨ Added
+
+- **Missing Dependency**: `dotenv` ditambahkan ke dependencies — digunakan di `prisma.config.ts` untuk load environment variables.
+
+---
+
 ## [2.0.0] - 2026-08-26
 
 ### 🔄 Changed

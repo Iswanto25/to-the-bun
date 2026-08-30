@@ -1,7 +1,7 @@
 # ==================================
 # Stage 1: Dependencies
 # ==================================
-FROM oven/bun:1-alpine AS dependencies
+FROM oven/bun:1.4-alpine AS dependencies
 
 WORKDIR /app
 
@@ -13,7 +13,7 @@ RUN bun install --frozen-lockfile
 # ==================================
 # Stage 2: Build
 # ==================================
-FROM oven/bun:1-alpine AS build
+FROM oven/bun:1.4-alpine AS build
 
 WORKDIR /app
 
@@ -30,7 +30,7 @@ RUN bun build src/app.ts --outdir=dist --target=bun --packages=external && \
 # ==================================
 # Stage 3: Production
 # ==================================
-FROM oven/bun:1-alpine AS production
+FROM oven/bun:1.4-alpine AS production
 
 RUN apk add --no-cache dumb-init
 

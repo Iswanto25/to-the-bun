@@ -40,18 +40,18 @@ Setiap fitur (misal: `auth`) memiliki ekosistem sendiri: controller, service, re
 
 ## Fitur Utama
 
-| Layer       | Tech                                            |
-| ----------- | ----------------------------------------------- |
-| Runtime     | **Bun** (v1.x)                                  |
-| Framework   | **ElysiaJS** (Bun-native)                       |
-| Language    | TypeScript (ESM, bundler)                       |
-| ORM         | Prisma v7 + PostgreSQL                          |
-| Cache/Queue | Redis (ioredis) + BullMQ                        |
-| Auth        | JWT (access 1d, refresh 7d) + Redis token store |
-| Storage     | MinIO/S3 via @aws-sdk                           |
-| Logger      | Pino (via response helper)                      |
-| Test        | Bun test runner (`bun test`)                    |
-| Container   | Docker multi-stage                              |
+| Layer       | Tech                                                                 |
+| ----------- | -------------------------------------------------------------------- |
+| Runtime     | **Bun** (v1.x)                                                       |
+| Framework   | **ElysiaJS** (Bun-native)                                            |
+| Language    | TypeScript (ESM, bundler)                                            |
+| ORM         | Prisma v7 + PostgreSQL (pg Pool adapter) + Seed di prisma.config.ts  |
+| Cache/Queue | Redis (ioredis) + BullMQ                                             |
+| Auth        | JWT (access 15m, refresh 7d) + token store in Redis                  |
+| Storage     | MinIO/S3 via @aws-sdk                                                |
+| Logger      | Pino (centralized via response helper, pino-http removed)            |
+| Test        | **Bun test runner** (`bun test`)                                     |
+| Container   | Docker multi-stage                                                   |
 
 - **RBAC** granular: Module → Resource → Action-based permissions. Role "Superadmin" bypass semua check.
 - **Security**: Zod validation, custom security headers, CORS, rate limiting (Redis), HMAC-SHA256 API signature, AES-256-GCM NIK encryption.
@@ -80,7 +80,11 @@ src/
 │   │   ├── jobs/                   # BullMQ queue, worker, job processor
 │   │   └── auth.routes.ts          # Elysia route definitions
 │   └── upload/                     # File upload (presigned URL)
-├── middlewares/                     # (removed — replaced by plugins)
+│       ├── controllers/            # HTTP request handlers
+│       ├── services/               # Business logic
+│       ├── validations/            # Zod schemas
+│       ├── types/                  # Zod-inferred types
+│       └── upload.routes.ts        # Elysia route definitions
 ├── plugins/
 │   ├── requestContext.plugin.ts    # Request ID, sensitive data masking
 │   ├── auth.plugin.ts              # JWT verification + user loading
@@ -89,7 +93,10 @@ src/
 ├── routes/
 │   └── index.ts                    # Elysia route aggregator
 └── utils/
+    ├── auditLogger.ts              # Audit log DB writer (buffered)
     ├── encryption.ts               # AES-256-GCM encrypt/decrypt
+    ├── generateData.ts             # Faker-based data generator
+    ├── healthCheck.ts              # Service health check reporter
     ├── jwt.ts                      # JWT sign/verify helpers
     ├── logger.ts                   # Pino logger setup
     ├── mail.ts                     # HTML email templates
@@ -99,15 +106,14 @@ src/
     ├── signature.ts                # HMAC-SHA256 API key verification
     ├── smtp.ts                     # Nodemailer SMTP sender
     ├── tokenStore.ts               # Redis token CRUD
-    ├── auditLogger.ts              # Audit log DB writer (buffered)
-    └── utils.ts                    # Password hashing, validation, OTP, pLimit
+    └── utils.ts                    # Password hashing, email/phone validation, OTP, pLimit
 ```
 
 ## Quick Start
 
 ### Prerequisites
 
-- [Bun](https://bun.sh/) v1.1+
+- [Bun](https://bun.sh/) v1.4+
 - PostgreSQL
 - Redis (untuk BullMQ & caching)
 
@@ -124,13 +130,16 @@ cp .env.example .env
 
 ```env
 NODE_ENV=development
-PORT=4004
-HOST=localhost
+PORT=3006
+HOST=0.0.0.0
 DATABASE_URL="your-database-connection-string"
-DATA_ENCRYPTION_KEY="your-32-character-hex-key"
+DATA_ENCRYPTION_KEY="your-64-char-hex-key"
 JWT_SECRET="your-jwt-secret-key"
 JWT_REFRESH_SECRET="your-refresh-secret-key"
-SALT_ROUNDS=10  # bcrypt salt rounds (4-31)
+ACCESS_TOKEN_EXPIRES_IN=15m
+REFRESH_TOKEN_EXPIRES_IN=7d
+SALT_HASH="your-custom-salt-string"
+SALT_ROUNDS=5
 ```
 
 **Optional Services:**
@@ -139,18 +148,34 @@ SALT_ROUNDS=10  # bcrypt salt rounds (4-31)
 # Redis
 REDIS_HOST=localhost
 REDIS_PORT=6379
+REDIS_PASSWORD=
+REDIS_DB=0
 
 # S3 Storage
-S3_ENDPOINT=localhost:9000
-S3_BUCKET_NAME=your-bucket
+S3_ENDPOINT=localhost
+S3_PORT=9000
+S3_BUCKET_NAME=uploads
 S3_ACCESS_KEY=your-access-key
 S3_SECRET_KEY=your-secret-key
+STORAGE_PUBLIC_URL=https://your-storage-url.com
+S3_USE_SSL=false
+S3_REGION=us-east-1
 
 # SMTP
+APP_NAME=Boilerplate ElysiaJS
 SMTP_HOST=smtp.gmail.com
 SMTP_PORT=587
+SMTP_SECURE=false
 SMTP_USER=your-email@gmail.com
 SMTP_PASS=your-app-password
+SMTP_FROM=noreply@yourdomain.com
+
+# CORS (comma-separated list of allowed origins)
+ALLOWED_ORIGINS=http://localhost:3000,http://localhost:3001
+
+# API Signature (HMAC-SHA256)
+USER_KEY=superSecret
+SECRET_KEY=secretKey
 ```
 
 ### Setup Database
@@ -180,7 +205,7 @@ bun run start
 bun run worker:start
 ```
 
-Server berjalan di `http://localhost:4004`.
+Server berjalan di `http://localhost:3006` (configurable via `PORT` env).
 
 ## Available Scripts
 
@@ -192,9 +217,14 @@ Server berjalan di `http://localhost:4004`.
 | `bun run start`         | Run production server                          |
 | `bun run worker:start`  | Run production worker                          |
 | `bun run start:migrate` | Migrate + start server                         |
-| `bun test`              | Run test suite                                 |
-| `bun run lint`          | Check linting                                  |
+| `bun run lint`          | Check linting (ESLint)                         |
 | `bun run lint:fix`      | Fix linting                                    |
+| `bun run typecheck`     | Type check (tsc --noEmit)                      |
+| `bun test`              | Run all test suite                             |
+| `bun run test:unit`     | Run unit tests only                            |
+| `bun run test:integration` | Run integration tests                       |
+| `bun run test:infra`    | Run infrastructure tests                       |
+| `bun run generate-api-key` | Generate HMAC-SHA256 API key                |
 
 ## API Endpoints
 
@@ -206,14 +236,14 @@ GET /health
 
 ```json
 {
-	"success": true,
-	"message": "Service is healthy",
-	"data": {
-		"status": "ok",
-		"timestamp": "2026-08-26 21:13:45",
-		"version": "1.0.0",
-		"environment": "development"
-	}
+  "success": true,
+  "message": "Service is healthy",
+  "data": {
+    "status": "ok",
+    "timestamp": "2026-08-30 12:00:00",
+    "version": "1.0.0",
+    "environment": "development"
+  }
 }
 ```
 
@@ -251,29 +281,35 @@ import { authController } from "./controllers/auth.controller.js";
 import { verifyToken } from "../../plugins/auth.plugin.js";
 import { rateLimiter } from "../../plugins/rateLimiter.plugin.js";
 
-const publicRoutes = new Elysia().post("/register", authController.register).post("/login", authController.login);
+const publicRoutes = new Elysia()
+  .post("/register", authController.register)
+  .post("/login", authController.login);
 
-const protectedRoutes = new Elysia({ name: "auth-protected" }).use(verifyToken).get("/profile", authController.profile, {
-	beforeHandle: [rateLimiter({ windowInSeconds: 30, maxRequests: 3, useUserId: true })],
-});
+const protectedRoutes = new Elysia({ name: "auth-protected" })
+  .use(verifyToken)
+  .get("/profile", authController.profile, {
+    beforeHandle: [rateLimiter({ windowInSeconds: 30, maxRequests: 3, useUserId: true })],
+  });
 
-export const authRoutes = new Elysia({ prefix: "/auth" }).use(publicRoutes).use(protectedRoutes);
+export const authRoutes = new Elysia({ prefix: "/auth" })
+  .use(publicRoutes)
+  .use(protectedRoutes);
 ```
 
 ## Controller Pattern
 
 ```typescript
 export const authController = {
-	register: async (ctx: any) => {
-		const data = validateOrThrow(authValidation.register, ctx.body);
-		const result = await authServices.register(data);
-		return respons.success("Berhasil register", result, HttpStatus.OK, ctx);
-	},
+  register: async (ctx: any) => {
+    const data = validateOrThrow(authValidation.register, ctx.body);
+    const result = await authServices.register(data);
+    return respons.success("Berhasil register", result, HttpStatus.OK, ctx);
+  },
 
-	profile: async (ctx: any) => {
-		const result = await authServices.profile(ctx.user.id);
-		return respons.success("Berhasil get profile", result, HttpStatus.OK, ctx);
-	},
+  profile: async (ctx: any) => {
+    const result = await authServices.profile(ctx.user.id);
+    return respons.success("Berhasil get profile", result, HttpStatus.OK, ctx);
+  },
 };
 ```
 
@@ -285,27 +321,29 @@ export const authController = {
 ### Request Context (derive global)
 
 ```typescript
-export const requestContext = new Elysia({ name: "request-context" }).derive({ as: "global" }, ({ request }) => ({
-	reqId: request.headers.get("x-request-id") || crypto.randomUUID(),
-	startTime: Date.now(),
-}));
+export const requestContext = new Elysia({ name: "request-context" })
+  .derive({ as: "global" }, ({ request }) => ({
+    reqId: request.headers.get("x-request-id") || crypto.randomUUID(),
+    startTime: Date.now(),
+  }));
 ```
 
 ### Auth (derive global)
 
 ```typescript
-export const verifyToken = new Elysia({ name: "auth" }).derive({ as: "global" }, async ({ headers, set }) => {
-	// Verify JWT, load user from Redis/DB, attach to ctx.user
-});
+export const verifyToken = new Elysia({ name: "auth" })
+  .derive({ as: "global" }, async ({ headers, set }) => {
+    // Verify JWT, load user from Redis/DB, attach to ctx.user
+  });
 ```
 
 ### RBAC (beforeHandle hook)
 
 ```typescript
 export const requirePermission = (resourceName: string, action: string) => {
-	return async (ctx: any) => {
-		// Check ctx.user.roleId against RolePermission + Resource
-	};
+  return async (ctx: any) => {
+    // Check ctx.user.roleId against RolePermission + Resource
+  };
 };
 ```
 
@@ -313,9 +351,9 @@ export const requirePermission = (resourceName: string, action: string) => {
 
 ```typescript
 export const rateLimiter = (options: { windowInSeconds: number; maxRequests: number; useUserId?: boolean }) => {
-	return async (ctx: any) => {
-		// Redis-based sliding window, graceful degradation if Redis unavailable
-	};
+  return async (ctx: any) => {
+    // Redis-based sliding window, graceful degradation if Redis unavailable
+  };
 };
 ```
 
@@ -324,7 +362,7 @@ export const rateLimiter = (options: { windowInSeconds: number; maxRequests: num
 - **Custom Security Headers** — via Elysia onRequest hook (CSP, HSTS, X-Frame-Options, X-Content-Type-Options, dll)
 - **CORS** — configurable via environment
 - **Rate Limiting** — Redis-based sliding window (optional, graceful degradation)
-- **JWT Authentication** — access token (1d) + refresh token (7d) with Redis token store
+- **JWT Authentication** — access token (15m) + refresh token (7d) with Redis token store
 - **RBAC** — granular permission per module/resource/action
 - **Input Validation** — Zod schemas with `validateOrThrow()`
 - **Password Hashing** — `Bun.password.hash/verify` with configurable bcrypt salt rounds
@@ -337,6 +375,9 @@ export const rateLimiter = (options: { windowInSeconds: number; maxRequests: num
 ```bash
 # All tests
 bun test
+
+# Unit tests
+bun run test:unit
 
 # Integration tests
 bun run test:integration
@@ -351,46 +392,51 @@ bun run test:infra
 
 - **bun** (v1.x) — Runtime & package manager
 - **elysia** (v1.4.x) — Web framework (Bun-native)
+- **@elysiajs/cors** (v1.4.x) — CORS handling
 - **typescript** (v5.9.x) — Type safety
-- **@prisma/client** (v7.x) — Database ORM
+- **@prisma/client** (v7.x) — Database ORM (pg Pool adapter)
 - **zod** (v4.x) — Schema validation
 - **bullmq** (v5.x) — Background jobs
 - **ioredis** (v5.x) — Redis client
 - **jsonwebtoken** (v9.x) — JWT authentication
 
-### Security
-
-- **@elysiajs/cors** — CORS handling
-
 ### File Handling
 
 - **@aws-sdk/client-s3** (v3.x) — S3 integration
+- **@aws-sdk/s3-request-presigner** (v3.x) — S3 presigned URLs
 
 ### Utilities
 
 - **pino** (v10.x) — Logging
 - **nodemailer** (v7.x) — Email sending
 - **dotenv** (v17.x) — Environment variables
+- **@faker-js/faker** (v8.x) — Fake data generation
 
 ### Development & Testing
 
 - **bun test** — Native fast testing
 - **eslint** (v9.x) — Linting
 - **prettier** — Code formatting
+- **typescript-eslint** — TypeScript ESLint integration
 
 ## CI/CD
 
-### GitHub Actions Staging Deploy
+### GitHub Actions (Staging Deploy)
 
-Push ke branch `staging` memicu pipeline 7 jobs:
+Push ke branch `staging` memicu pipeline multi-job:
 
-1. **Lint** — ESLint check
-2. **Unit Tests** — Utils, plugins, auth services & controllers
-3. **Integration Tests** — Auth API HTTP tests
-4. **Build** — Bundle via Bun
-5. **Deploy** — SCP + PM2 canary deploy
-6. **Health Check** — SSH curl `localhost:4004/health`
-7. **Notify** — Deployment summary
+1. **Notify Start** — Telegram notification
+2. **Analyze** — Checkout → Install → Prisma Generate → Lint → Type Check → Unit Tests
+3. **Build** — Compile TypeScript → Upload artifacts
+4. **Transfer** — SCP artifacts ke server
+5. **Pre-Deploy** — Install deps → Run migrations di server
+6. **Deploy** — PM2 reload (zero downtime)
+7. **Health Check** — Verify application health
+8. **Notify** — Telegram notification (success/failure)
+
+### Jenkins Pipeline
+
+Pipeline lengkap dengan stage: Setup → Verify (Lint, TypeCheck, Unit Test, Integration Test parallel) → Build → Deploy → Health Check → Cleanup → Notify.
 
 ## License
 
