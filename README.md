@@ -40,18 +40,18 @@ Setiap fitur (misal: `auth`) memiliki ekosistem sendiri: controller, service, re
 
 ## Fitur Utama
 
-| Layer       | Tech                                                                 |
-| ----------- | -------------------------------------------------------------------- |
-| Runtime     | **Bun** (v1.x)                                                       |
-| Framework   | **ElysiaJS** (Bun-native)                                            |
-| Language    | TypeScript (ESM, bundler)                                            |
-| ORM         | Prisma v7 + PostgreSQL (pg Pool adapter) + Seed di prisma.config.ts  |
-| Cache/Queue | Redis (ioredis) + BullMQ                                             |
-| Auth        | JWT (access 15m, refresh 7d) + token store in Redis                  |
-| Storage     | MinIO/S3 via @aws-sdk                                                |
-| Logger      | Pino (centralized via response helper, pino-http removed)            |
-| Test        | **Bun test runner** (`bun test`)                                     |
-| Container   | Docker multi-stage                                                   |
+| Layer       | Tech                                                                |
+| ----------- | ------------------------------------------------------------------- |
+| Runtime     | **Bun** (v1.x)                                                      |
+| Framework   | **ElysiaJS** (Bun-native)                                           |
+| Language    | TypeScript (ESM, bundler)                                           |
+| ORM         | Prisma v7 + PostgreSQL (pg Pool adapter) + Seed di prisma.config.ts |
+| Cache/Queue | Redis (ioredis) + BullMQ                                            |
+| Auth        | JWT (access 15m, refresh 7d) + token store in Redis                 |
+| Storage     | MinIO/S3 via @aws-sdk                                               |
+| Logger      | Pino (centralized via response helper, pino-http removed)           |
+| Test        | **Bun test runner** (`bun test`)                                    |
+| Container   | Docker multi-stage                                                  |
 
 - **RBAC** granular: Module → Resource → Action-based permissions. Role "Superadmin" bypass semua check.
 - **Security**: Zod validation, custom security headers, CORS, rate limiting (Redis), HMAC-SHA256 API signature, AES-256-GCM NIK encryption.
@@ -209,22 +209,22 @@ Server berjalan di `http://localhost:3006` (configurable via `PORT` env).
 
 ## Available Scripts
 
-| Script                  | Description                                    |
-| ----------------------- | ---------------------------------------------- |
-| `bun run dev`           | Start development server + worker (hot-reload) |
-| `bun run worker:dev`    | Start worker saja (hot-reload)                 |
-| `bun run build`         | Bundle app.js + worker.js                      |
-| `bun run start`         | Run production server                          |
-| `bun run worker:start`  | Run production worker                          |
-| `bun run start:migrate` | Migrate + start server                         |
-| `bun run lint`          | Check linting (ESLint)                         |
-| `bun run lint:fix`      | Fix linting                                    |
-| `bun run typecheck`     | Type check (tsc --noEmit)                      |
-| `bun test`              | Run all test suite                             |
-| `bun run test:unit`     | Run unit tests only                            |
-| `bun run test:integration` | Run integration tests                       |
-| `bun run test:infra`    | Run infrastructure tests                       |
-| `bun run generate-api-key` | Generate HMAC-SHA256 API key                |
+| Script                     | Description                                    |
+| -------------------------- | ---------------------------------------------- |
+| `bun run dev`              | Start development server + worker (hot-reload) |
+| `bun run worker:dev`       | Start worker saja (hot-reload)                 |
+| `bun run build`            | Bundle app.js + worker.js                      |
+| `bun run start`            | Run production server                          |
+| `bun run worker:start`     | Run production worker                          |
+| `bun run start:migrate`    | Migrate + start server                         |
+| `bun run lint`             | Check linting (ESLint)                         |
+| `bun run lint:fix`         | Fix linting                                    |
+| `bun run typecheck`        | Type check (tsc --noEmit)                      |
+| `bun test`                 | Run all test suite                             |
+| `bun run test:unit`        | Run unit tests only                            |
+| `bun run test:integration` | Run integration tests                          |
+| `bun run test:infra`       | Run infrastructure tests                       |
+| `bun run generate-api-key` | Generate HMAC-SHA256 API key                   |
 
 ## API Endpoints
 
@@ -236,14 +236,14 @@ GET /health
 
 ```json
 {
-  "success": true,
-  "message": "Service is healthy",
-  "data": {
-    "status": "ok",
-    "timestamp": "2026-08-30 12:00:00",
-    "version": "1.0.0",
-    "environment": "development"
-  }
+	"success": true,
+	"message": "Service is healthy",
+	"data": {
+		"status": "ok",
+		"timestamp": "2026-08-30 12:00:00",
+		"version": "1.0.0",
+		"environment": "development"
+	}
 }
 ```
 
@@ -281,35 +281,29 @@ import { authController } from "./controllers/auth.controller.js";
 import { verifyToken } from "../../plugins/auth.plugin.js";
 import { rateLimiter } from "../../plugins/rateLimiter.plugin.js";
 
-const publicRoutes = new Elysia()
-  .post("/register", authController.register)
-  .post("/login", authController.login);
+const publicRoutes = new Elysia().post("/register", authController.register).post("/login", authController.login);
 
-const protectedRoutes = new Elysia({ name: "auth-protected" })
-  .use(verifyToken)
-  .get("/profile", authController.profile, {
-    beforeHandle: [rateLimiter({ windowInSeconds: 30, maxRequests: 3, useUserId: true })],
-  });
+const protectedRoutes = new Elysia({ name: "auth-protected" }).use(verifyToken).get("/profile", authController.profile, {
+	beforeHandle: [rateLimiter({ windowInSeconds: 30, maxRequests: 3, useUserId: true })],
+});
 
-export const authRoutes = new Elysia({ prefix: "/auth" })
-  .use(publicRoutes)
-  .use(protectedRoutes);
+export const authRoutes = new Elysia({ prefix: "/auth" }).use(publicRoutes).use(protectedRoutes);
 ```
 
 ## Controller Pattern
 
 ```typescript
 export const authController = {
-  register: async (ctx: any) => {
-    const data = validateOrThrow(authValidation.register, ctx.body);
-    const result = await authServices.register(data);
-    return respons.success("Berhasil register", result, HttpStatus.OK, ctx);
-  },
+	register: async (ctx: any) => {
+		const data = validateOrThrow(authValidation.register, ctx.body);
+		const result = await authServices.register(data);
+		return respons.success("Berhasil register", result, HttpStatus.OK, ctx);
+	},
 
-  profile: async (ctx: any) => {
-    const result = await authServices.profile(ctx.user.id);
-    return respons.success("Berhasil get profile", result, HttpStatus.OK, ctx);
-  },
+	profile: async (ctx: any) => {
+		const result = await authServices.profile(ctx.user.id);
+		return respons.success("Berhasil get profile", result, HttpStatus.OK, ctx);
+	},
 };
 ```
 
@@ -321,29 +315,27 @@ export const authController = {
 ### Request Context (derive global)
 
 ```typescript
-export const requestContext = new Elysia({ name: "request-context" })
-  .derive({ as: "global" }, ({ request }) => ({
-    reqId: request.headers.get("x-request-id") || crypto.randomUUID(),
-    startTime: Date.now(),
-  }));
+export const requestContext = new Elysia({ name: "request-context" }).derive({ as: "global" }, ({ request }) => ({
+	reqId: request.headers.get("x-request-id") || crypto.randomUUID(),
+	startTime: Date.now(),
+}));
 ```
 
 ### Auth (derive global)
 
 ```typescript
-export const verifyToken = new Elysia({ name: "auth" })
-  .derive({ as: "global" }, async ({ headers, set }) => {
-    // Verify JWT, load user from Redis/DB, attach to ctx.user
-  });
+export const verifyToken = new Elysia({ name: "auth" }).derive({ as: "global" }, async ({ headers, set }) => {
+	// Verify JWT, load user from Redis/DB, attach to ctx.user
+});
 ```
 
 ### RBAC (beforeHandle hook)
 
 ```typescript
 export const requirePermission = (resourceName: string, action: string) => {
-  return async (ctx: any) => {
-    // Check ctx.user.roleId against RolePermission + Resource
-  };
+	return async (ctx: any) => {
+		// Check ctx.user.roleId against RolePermission + Resource
+	};
 };
 ```
 
@@ -351,9 +343,9 @@ export const requirePermission = (resourceName: string, action: string) => {
 
 ```typescript
 export const rateLimiter = (options: { windowInSeconds: number; maxRequests: number; useUserId?: boolean }) => {
-  return async (ctx: any) => {
-    // Redis-based sliding window, graceful degradation if Redis unavailable
-  };
+	return async (ctx: any) => {
+		// Redis-based sliding window, graceful degradation if Redis unavailable
+	};
 };
 ```
 

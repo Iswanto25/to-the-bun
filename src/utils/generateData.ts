@@ -1,6 +1,5 @@
 import { fakerID_ID as faker } from "@faker-js/faker";
 import path from "node:path";
-import fs from "node:fs";
 
 interface UserData {
 	name: string;
@@ -62,7 +61,7 @@ const generateUserData = (count: number): UserData[] => {
 /**
  * Generate and save user data to JSON file
  */
-const main = () => {
+const main = async () => {
 	const COUNT = 1000;
 
 	console.info(`Generating ${COUNT} unique user data...`);
@@ -72,7 +71,7 @@ const main = () => {
 	const endTime = Date.now();
 
 	const outputPath = path.join(process.cwd(), "test_data.json");
-	fs.writeFileSync(outputPath, JSON.stringify(users, null, 2));
+	await Bun.write(outputPath, JSON.stringify(users, null, 2));
 
 	console.info(`Successfully generated ${users.length} users`);
 	console.info(`Saved to: ${outputPath}`);
@@ -82,7 +81,7 @@ const main = () => {
 };
 
 // Run if executed directly
-if (require.main === module) {
+if (import.meta.main) {
 	main();
 }
 

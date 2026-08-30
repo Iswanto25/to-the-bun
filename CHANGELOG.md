@@ -6,6 +6,31 @@ Format mengikuti [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), dan p
 
 ---
 
+## [2.1.0] - 2026-08-30
+
+### 🔄 Changed
+
+- **S3 → Bun.S3Client**: Migrasi dari `@aws-sdk/client-s3` + `@aws-sdk/s3-request-presigner` ke `Bun.S3Client` bawaan. Operasi upload, delete, presign, stat, dan list menggunakan API native Bun.
+- **Redis → Bun.RedisClient**: Migrasi dari `ioredis` ke `Bun.RedisClient` bawaan. Koneksi, set/get, incr, expire, ttl, dan del menggunakan API native Bun.
+- **File IO → Bun.write**: `generateData.ts` menggunakan `Bun.write()` alih-alih `fs.writeFileSync()`. Pattern `import.meta.main` menggantikan `require.main === module`.
+- **Infrastructure Test**: Update Redis connectivity test untuk menggunakan `redisState.isAvailable` alih-alih `client.status`.
+
+### 🗑️ Removed
+
+- **@aws-sdk/client-s3**: Dihapus dari dependencies — digantikan `Bun.S3Client`.
+- **@aws-sdk/s3-request-presigner**: Dihapus dari dependencies — presign sudah built-in di `Bun.S3Client`.
+- **ioredis**: Dihapus dari dependencies — digantikan `Bun.RedisClient`.
+
+### 📝 Note
+
+Fitur yang **belum dimigrasi** ke API Bun bawaan:
+- **BullMQ** (queue/worker) → Tidak diganti karena `Bun.cron` hanya untuk scheduled tasks, bukan job queue
+- **Bun.Worker** → Tidak diganti karena BullMQ Worker berbeda konsep dengan Bun Worker threads
+- **Bun.Archive** → Tidak digunakan di project ini
+- **logger.ts** → Masih menggunakan `fs.createWriteStream` untuk kompatibilitas dengan `pino.multistream`
+
+---
+
 ## [2.0.1] - 2026-08-30
 
 ### 🔄 Changed

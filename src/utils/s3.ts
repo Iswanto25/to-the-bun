@@ -1,23 +1,12 @@
-import {
-	S3Client,
-	PutObjectCommand,
-	GetObjectCommand,
-	DeleteObjectCommand,
-	HeadObjectCommand,
-	DeleteObjectsCommand,
-	ListObjectsV2Command,
-} from "@aws-sdk/client-s3";
-import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { S3Client } from "bun";
 import path from "node:path";
 import { randomString } from "@/utils/utils.js";
 import { logger } from "@/utils/logger.js";
 
 function normalizeEndpoint(raw?: string, useSSL?: boolean, port?: string): string | null {
 	if (!raw?.trim()) return null;
-	// Remove trailing slashes without regex (avoids ReDoS)
 	let e = raw.trim();
 	while (e.endsWith("/")) e = e.slice(0, -1);
-	// Check for protocol prefix without regex (avoids ReDoS)
 	const lower = e.toLowerCase();
 	if (!lower.startsWith("http://") && !lower.startsWith("https://")) {
 		e = `${useSSL ? "https" : "http"}://${e}`;
@@ -40,7 +29,6 @@ function normalizeEndpoint(raw?: string, useSSL?: boolean, port?: string): strin
 const USE_SSL = String(Bun.env.S3_USE_SSL || "").toLowerCase() === "true";
 const S3_PORT = Bun.env.S3_PORT?.trim();
 const ENDPOINT = normalizeEndpoint(Bun.env.S3_ENDPOINT, USE_SSL, S3_PORT);
-const REGION = Bun.env.S3_REGION?.trim() || "us-east-1";
 const BUCKET = Bun.env.S3_BUCKET_NAME?.trim();
 const ACCESS_KEY = Bun.env.S3_ACCESS_KEY?.trim();
 const SECRET_KEY = Bun.env.S3_SECRET_KEY?.trim();
@@ -52,10 +40,10 @@ const s3Holder: { client: S3Client | null } = { client: null };
 if (isS3Configured) {
 	try {
 		s3Holder.client = new S3Client({
-			region: REGION,
+			accessKeyId: ACCESS_KEY,
+			secretAccessKey: SECRET_KEY,
+			bucket: BUCKET,
 			endpoint: ENDPOINT,
-			forcePathStyle: true,
-			credentials: { accessKeyId: ACCESS_KEY, secretAccessKey: SECRET_KEY },
 		});
 		console.info("S3 Storage configured successfully");
 	} catch {
@@ -98,13 +86,11 @@ export async function getPresignedUploadUrl(
 	const key = `${folder}/${fileName}`;
 	const expiresIn = opts.expiresIn ?? 3600;
 
-	const command = new PutObjectCommand({
-		Bucket: BUCKET,
-		Key: key,
-		...(opts.contentType ? { ContentType: opts.contentType } : {}),
+	const url = s3.presign(key, {
+		method: "PUT",
+		expiresIn,
+		...(opts.contentType ? { type: opts.contentType } : {}),
 	});
-
-	const url = await getSignedUrl(s3, command, { expiresIn });
 
 	return { url, key, publicUrl: publicUrl(key) };
 }
@@ -122,19 +108,21 @@ export async function headFile(folder: string, file: string) {
 	if (!s3Holder.client) throwS3NotConfigured();
 	const s3 = s3Holder.client;
 
-	const Key = `${folder}/${file}`;
+	const key = `${folder}/${file}`;
 	try {
-		const res = await s3.send(new HeadObjectCommand({ Bucket: BUCKET, Key }));
+		const s3File = s3.file(key);
+		const stat = await s3File.stat();
+		if (!stat) return { exists: false as const };
 		return {
 			exists: true as const,
-			etag: res.ETag,
-			contentLength: res.ContentLength,
-			contentType: res.ContentType,
-			lastModified: res.LastModified,
+			etag: stat.etag,
+			contentLength: stat.size,
+			contentType: stat.type,
+			lastModified: stat.lastModified,
 		};
 	} catch (err) {
-		const error = err as { $metadata?: { httpStatusCode: number } };
-		if (error?.$metadata?.httpStatusCode === 404) return { exists: false as const };
+		const error = err as { status?: number };
+		if (error?.status === 404) return { exists: false as const };
 		throw err;
 	}
 }
@@ -158,15 +146,10 @@ export async function uploadFile(file: { originalname: string; mimetype: string;
 	}
 
 	try {
-		await s3.send(
-			new PutObjectCommand({
-				Bucket: BUCKET,
-				Key: key,
-				Body: body,
-				ContentType: file.mimetype || "application/octet-stream",
-				Metadata: { uploadedBy: "api" },
-			}),
-		);
+		const s3File = s3.file(key);
+		await s3File.write(body, {
+			type: file.mimetype || "application/octet-stream",
+		});
 		return { fileName, folder };
 	} finally {
 		if (file.path) {
@@ -251,7 +234,6 @@ export async function uploadBase64(folder: string, file: string, maxSizeInMB: nu
 		});
 	}
 
-	// 🔍 PROFILING: Start total time
 	const totalStartTime = Date.now();
 	const memStart = process.memoryUsage().heapUsed / 1024 / 1024;
 
@@ -271,7 +253,6 @@ export async function uploadBase64(folder: string, file: string, maxSizeInMB: nu
 		});
 	}
 
-	// 🔍 PROFILING: Decode base64 (CPU bound)
 	const decodeStart = Date.now();
 	const buffer = Buffer.from(stripAsciiWhitespace(base64Data), "base64");
 	const fileSizeMB = (buffer.length / 1024 / 1024).toFixed(2);
@@ -296,15 +277,10 @@ export async function uploadBase64(folder: string, file: string, maxSizeInMB: nu
 
 	const uploadStart = Date.now();
 	try {
-		await s3.send(
-			new PutObjectCommand({
-				Bucket: BUCKET,
-				Key: key,
-				Body: buffer,
-				ContentType: mimeType,
-				Metadata: { uploadedBy: "api" },
-			}),
-		);
+		const s3File = s3.file(key);
+		await s3File.write(new Response(buffer), {
+			type: mimeType,
+		});
 		const uploadTime = Date.now() - uploadStart;
 		logger.info(`upload: ${uploadTime}ms`);
 	} catch (e) {
@@ -353,15 +329,12 @@ export async function getFile(
 			if (!head.exists) return null;
 		}
 
-		const command = new GetObjectCommand({
-			Bucket: BUCKET,
-			Key: key,
-			ResponseCacheControl: opts?.cacheControl ?? "public, max-age=31536000, immutable",
-			ResponseContentDisposition: opts?.contentDisposition ?? "inline",
-			...(opts?.contentType ? { ResponseContentType: opts.contentType } : {}),
+		const url = s3.presign(key, {
+			method: "GET",
+			expiresIn: expired,
 		});
 
-		return await getSignedUrl(s3, command, { expiresIn: expired });
+		return url;
 	} catch (error) {
 		logger.error({ err: error }, "Error getFile from S3 Storage");
 		return null;
@@ -379,27 +352,28 @@ export async function deleteFile(
 	}
 	const s3 = s3Holder.client;
 
-	const Key = `${folder}/${file}`;
+	const key = `${folder}/${file}`;
 	const strict = opts?.strict ?? true;
 	const verifyAfter = opts?.verifyAfter ?? false;
 
 	try {
 		if (strict) {
 			const pre = await headFile(folder, file);
-			if (!pre.exists) return { deleted: false, key: Key, reason: "not_found" };
+			if (!pre.exists) return { deleted: false, key, reason: "not_found" };
 		}
 
-		await s3.send(new DeleteObjectCommand({ Bucket: BUCKET, Key }));
+		const s3File = s3.file(key);
+		await s3File.delete();
 
 		if (verifyAfter) {
 			const post = await headFile(folder, file);
-			if (post.exists) return { deleted: false, key: Key, reason: "still_exists" };
+			if (post.exists) return { deleted: false, key, reason: "still_exists" };
 		}
 
-		return { deleted: true, key: Key };
+		return { deleted: true, key };
 	} catch (error) {
 		logger.error({ err: error }, "Error deleteFile from S3 Storage");
-		return { deleted: false, key: Key, reason: "error" };
+		return { deleted: false, key, reason: "error" };
 	}
 }
 
@@ -412,28 +386,20 @@ export async function deleteMany(items: Array<{ folder: string; file: string }>)
 
 	if (!items.length) return { deleted: [], errors: [] };
 
-	const toKey = (i: { folder: string; file: string }) => `${i.folder}/${i.file}`;
-
-	const chunks: Array<Array<{ folder: string; file: string }>> = [];
-	for (let i = 0; i < items.length; i += 1000) chunks.push(items.slice(i, i + 1000));
-
 	const deleted: string[] = [];
 	const errors: string[] = [];
 
-	for (const chunk of chunks) {
+	for (const item of items) {
+		const key = `${item.folder}/${item.file}`;
 		try {
-			const res = await s3.send(
-				new DeleteObjectsCommand({
-					Bucket: BUCKET,
-					Delete: { Objects: chunk.map((i) => ({ Key: toKey(i) })), Quiet: true },
-				}),
-			);
-			res.Deleted?.forEach((d) => d.Key && deleted.push(d.Key));
-			res.Errors?.forEach((e) => e.Key && errors.push(`${e.Key}: ${e.Code} ${e.Message || ""}`.trim()));
+			const s3File = s3.file(key);
+			await s3File.delete();
+			deleted.push(key);
 		} catch (err) {
-			chunk.forEach((i) => errors.push(`${toKey(i)}: ${(err as Error)?.message || "DeleteObjects failed"}`));
+			errors.push(`${key}: ${(err as Error)?.message || "Delete failed"}`);
 		}
 	}
+
 	return { deleted, errors };
 }
 
@@ -444,35 +410,37 @@ export async function deleteByPrefix(prefix: string): Promise<{ deleted: number;
 	}
 	const s3 = s3Holder.client;
 
-	let continuationToken: string | undefined = undefined;
+	const normalizedPrefix = prefix.endsWith("/") ? prefix : `${prefix}/`;
 	let totalDeleted = 0;
 	let totalErrors = 0;
 
-	do {
-		const listed: any = await s3.send(
-			new ListObjectsV2Command({
-				Bucket: BUCKET,
-				Prefix: prefix.endsWith("/") ? prefix : `${prefix}/`,
-				ContinuationToken: continuationToken,
-				MaxKeys: 1000,
-			}),
+	try {
+		const result = await S3Client.list(
+			{ prefix: normalizedPrefix, maxKeys: 1000 },
+			{
+				accessKeyId: ACCESS_KEY,
+				secretAccessKey: SECRET_KEY,
+				bucket: BUCKET,
+				endpoint: ENDPOINT ?? undefined,
+			},
 		);
 
-		const objects = (listed.Contents as any[]) ?? [];
-		if (!objects.length) break;
+		const objects = result.contents ?? [];
+		if (!objects.length) return { deleted: 0, errors: 0 };
 
-		const res = await s3.send(
-			new DeleteObjectsCommand({
-				Bucket: BUCKET,
-				Delete: { Objects: objects.map((o: any) => ({ Key: o.Key ?? "" })).filter((o: any) => o.Key), Quiet: true },
-			}),
-		);
-
-		totalDeleted += res.Deleted?.length || 0;
-		totalErrors += res.Errors?.length || 0;
-
-		continuationToken = listed.IsTruncated ? (listed.NextContinuationToken as string) : undefined;
-	} while (continuationToken);
+		for (const obj of objects) {
+			try {
+				const s3File = s3.file(obj.key);
+				await s3File.delete();
+				totalDeleted++;
+			} catch {
+				totalErrors++;
+			}
+		}
+	} catch (err) {
+		logger.error({ err }, "Error deleting by prefix");
+		totalErrors++;
+	}
 
 	return { deleted: totalDeleted, errors: totalErrors };
 }

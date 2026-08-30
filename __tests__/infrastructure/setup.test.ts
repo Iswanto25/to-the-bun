@@ -30,7 +30,7 @@ describe("Infrastructure Connectivity (Bun Runtime)", () => {
 	describe("Redis", () => {
 		beforeAll(async () => {
 			// Tunggu Redis connect jika lazy
-			if (redisState.client && redisState.client.status !== "ready") {
+			if (redisState.client && !redisState.isAvailable) {
 				try {
 					await redisState.client.connect();
 				} catch {
