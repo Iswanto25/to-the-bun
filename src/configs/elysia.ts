@@ -88,8 +88,7 @@ export const app = new Elysia({ name: "boilerplate-bun-elysia" })
 			message = "Terjadi kesalahan pada server";
 		} else {
 			const rawMessage = (error instanceof Error && error.message) || "Terjadi kesalahan pada server";
-			message =
-				isProduction && statusCode === HttpStatus.INTERNAL_SERVER_ERROR ? "Internal server error" : translateMessage(rawMessage);
+			message = isProduction && statusCode === HttpStatus.INTERNAL_SERVER_ERROR ? "Internal server error" : translateMessage(rawMessage);
 		}
 
 		return respons.error(message, hint || message, statusCode, { request, set, path, server });

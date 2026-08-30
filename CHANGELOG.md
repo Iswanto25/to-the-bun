@@ -13,10 +13,10 @@ Format mengikuti [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), dan p
 - **Framework — Express.js → ElysiaJS**: Migrasi penuh dari Express.js 5 ke **ElysiaJS** (Bun-native web framework). Express, helmet, compression, multer, dan pino-http dihapus.
 - **Server Setup**: `app.ts` dan `dev.ts` menggunakan `app.listen()` alih-alih `http.createServer()` — lebih ringkas dan optimal untuk Bun.
 - **Middleware → Elysia Plugins**: Semua middleware Express dikonversi ke Elysia plugin/derive/hook:
-  - `requestContext.ts` → `requestContext.plugin.ts` (derive global, reqId + startTime)
-  - `authMiddleware.ts` → `auth.plugin.ts` (derive global, verifyToken)
-  - `rbacMiddleware.ts` → `rbac.plugin.ts` (beforeHandle hook, `requirePermission`)
-  - `rateLimiter.ts` → `rateLimiter.plugin.ts` (beforeHandle hook, Redis-based)
+    - `requestContext.ts` → `requestContext.plugin.ts` (derive global, reqId + startTime)
+    - `authMiddleware.ts` → `auth.plugin.ts` (derive global, verifyToken)
+    - `rbacMiddleware.ts` → `rbac.plugin.ts` (beforeHandle hook, `requirePermission`)
+    - `rateLimiter.ts` → `rateLimiter.plugin.ts` (beforeHandle hook, Redis-based)
 - **Security Headers**: `helmet` dihapus — diganti custom `onRequest` hook yang menambahkan security headers secara manual (CSP, HSTS, X-Frame-Options, dll).
 - **File Upload**: `multer` dihapus — menggunakan native `File` API dari Bun. Controller menerima `ctx.body.photo` sebagai `File` langsung.
 - **Response Helper**: `respons.ts` ditulis ulang — parameter `req: Request, res: Response` diganti `ctx: ResponsCtx` (Elysia context). Fungsi `validateOrThrow` dan `apiError` dipertahankan.

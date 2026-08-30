@@ -56,3 +56,4 @@ migration-report.md
 .commandcode/*
 .opencode/
 graphify-out
+*.json

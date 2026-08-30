@@ -40,18 +40,18 @@ Setiap fitur (misal: `auth`) memiliki ekosistem sendiri: controller, service, re
 
 ## Fitur Utama
 
-| Layer | Tech |
-|---|---|
-| Runtime | **Bun** (v1.x) |
-| Framework | **ElysiaJS** (Bun-native) |
-| Language | TypeScript (ESM, bundler) |
-| ORM | Prisma v7 + PostgreSQL |
-| Cache/Queue | Redis (ioredis) + BullMQ |
-| Auth | JWT (access 1d, refresh 7d) + Redis token store |
-| Storage | MinIO/S3 via @aws-sdk |
-| Logger | Pino (via response helper) |
-| Test | Bun test runner (`bun test`) |
-| Container | Docker multi-stage |
+| Layer       | Tech                                            |
+| ----------- | ----------------------------------------------- |
+| Runtime     | **Bun** (v1.x)                                  |
+| Framework   | **ElysiaJS** (Bun-native)                       |
+| Language    | TypeScript (ESM, bundler)                       |
+| ORM         | Prisma v7 + PostgreSQL                          |
+| Cache/Queue | Redis (ioredis) + BullMQ                        |
+| Auth        | JWT (access 1d, refresh 7d) + Redis token store |
+| Storage     | MinIO/S3 via @aws-sdk                           |
+| Logger      | Pino (via response helper)                      |
+| Test        | Bun test runner (`bun test`)                    |
+| Container   | Docker multi-stage                              |
 
 - **RBAC** granular: Module → Resource → Action-based permissions. Role "Superadmin" bypass semua check.
 - **Security**: Zod validation, custom security headers, CORS, rate limiting (Redis), HMAC-SHA256 API signature, AES-256-GCM NIK encryption.
@@ -184,17 +184,17 @@ Server berjalan di `http://localhost:4004`.
 
 ## Available Scripts
 
-| Script | Description |
-|---|---|
-| `bun run dev` | Start development server + worker (hot-reload) |
-| `bun run worker:dev` | Start worker saja (hot-reload) |
-| `bun run build` | Bundle app.js + worker.js |
-| `bun run start` | Run production server |
-| `bun run worker:start` | Run production worker |
-| `bun run start:migrate` | Migrate + start server |
-| `bun test` | Run test suite |
-| `bun run lint` | Check linting |
-| `bun run lint:fix` | Fix linting |
+| Script                  | Description                                    |
+| ----------------------- | ---------------------------------------------- |
+| `bun run dev`           | Start development server + worker (hot-reload) |
+| `bun run worker:dev`    | Start worker saja (hot-reload)                 |
+| `bun run build`         | Bundle app.js + worker.js                      |
+| `bun run start`         | Run production server                          |
+| `bun run worker:start`  | Run production worker                          |
+| `bun run start:migrate` | Migrate + start server                         |
+| `bun test`              | Run test suite                                 |
+| `bun run lint`          | Check linting                                  |
+| `bun run lint:fix`      | Fix linting                                    |
 
 ## API Endpoints
 
@@ -206,42 +206,42 @@ GET /health
 
 ```json
 {
-  "success": true,
-  "message": "Service is healthy",
-  "data": {
-    "status": "ok",
-    "timestamp": "2026-08-26 21:13:45",
-    "version": "1.0.0",
-    "environment": "development"
-  }
+	"success": true,
+	"message": "Service is healthy",
+	"data": {
+		"status": "ok",
+		"timestamp": "2026-08-26 21:13:45",
+		"version": "1.0.0",
+		"environment": "development"
+	}
 }
 ```
 
 ### Authentication
 
-| Method | Endpoint | Description |
-|---|---|---|
-| `POST` | `/api/auth/register` | Register user baru |
-| `POST` | `/api/auth/login` | Login, mengembalikan access + refresh token |
-| `POST` | `/api/auth/refresh-token` | Refresh access token |
-| `POST` | `/api/auth/logout` | Logout user |
-| `GET` | `/api/auth/profile` | Get profil user |
-| `GET` | `/api/auth/users` | Get semua user (pagination + search) |
-| `PATCH` | `/api/auth/profile` | Update profil |
-| `PATCH` | `/api/auth/profile/photo` | Upload foto profil (multipart) |
-| `PATCH` | `/api/auth/profile/photo/direct` | Upload foto via presigned URL |
-| `DELETE` | `/api/auth/profile/:id` | Hapus akun |
-| `POST` | `/api/auth/forgot-password` | Kirim email reset password |
-| `POST` | `/api/auth/reset-password` | Reset password dengan token |
-| `POST` | `/api/auth/send-otp` | Kirim OTP ke email |
-| `POST` | `/api/auth/verify-otp` | Verifikasi OTP |
+| Method   | Endpoint                         | Description                                 |
+| -------- | -------------------------------- | ------------------------------------------- |
+| `POST`   | `/api/auth/register`             | Register user baru                          |
+| `POST`   | `/api/auth/login`                | Login, mengembalikan access + refresh token |
+| `POST`   | `/api/auth/refresh-token`        | Refresh access token                        |
+| `POST`   | `/api/auth/logout`               | Logout user                                 |
+| `GET`    | `/api/auth/profile`              | Get profil user                             |
+| `GET`    | `/api/auth/users`                | Get semua user (pagination + search)        |
+| `PATCH`  | `/api/auth/profile`              | Update profil                               |
+| `PATCH`  | `/api/auth/profile/photo`        | Upload foto profil (multipart)              |
+| `PATCH`  | `/api/auth/profile/photo/direct` | Upload foto via presigned URL               |
+| `DELETE` | `/api/auth/profile/:id`          | Hapus akun                                  |
+| `POST`   | `/api/auth/forgot-password`      | Kirim email reset password                  |
+| `POST`   | `/api/auth/reset-password`       | Reset password dengan token                 |
+| `POST`   | `/api/auth/send-otp`             | Kirim OTP ke email                          |
+| `POST`   | `/api/auth/verify-otp`           | Verifikasi OTP                              |
 
 ### Upload (requires S3)
 
-| Method | Endpoint | Description |
-|---|---|---|
+| Method | Endpoint                    | Description            |
+| ------ | --------------------------- | ---------------------- |
 | `POST` | `/api/upload/presigned-url` | Generate presigned URL |
-| `POST` | `/api/upload/confirm` | Konfirmasi upload |
+| `POST` | `/api/upload/confirm`       | Konfirmasi upload      |
 
 ## Route Pattern
 
@@ -251,35 +251,29 @@ import { authController } from "./controllers/auth.controller.js";
 import { verifyToken } from "../../plugins/auth.plugin.js";
 import { rateLimiter } from "../../plugins/rateLimiter.plugin.js";
 
-const publicRoutes = new Elysia()
-  .post("/register", authController.register)
-  .post("/login", authController.login);
+const publicRoutes = new Elysia().post("/register", authController.register).post("/login", authController.login);
 
-const protectedRoutes = new Elysia({ name: "auth-protected" })
-  .use(verifyToken)
-  .get("/profile", authController.profile, {
-    beforeHandle: [rateLimiter({ windowInSeconds: 30, maxRequests: 3, useUserId: true })],
-  });
+const protectedRoutes = new Elysia({ name: "auth-protected" }).use(verifyToken).get("/profile", authController.profile, {
+	beforeHandle: [rateLimiter({ windowInSeconds: 30, maxRequests: 3, useUserId: true })],
+});
 
-export const authRoutes = new Elysia({ prefix: "/auth" })
-  .use(publicRoutes)
-  .use(protectedRoutes);
+export const authRoutes = new Elysia({ prefix: "/auth" }).use(publicRoutes).use(protectedRoutes);
 ```
 
 ## Controller Pattern
 
 ```typescript
 export const authController = {
-  register: async (ctx: any) => {
-    const data = validateOrThrow(authValidation.register, ctx.body);
-    const result = await authServices.register(data);
-    return respons.success("Berhasil register", result, HttpStatus.OK, ctx);
-  },
+	register: async (ctx: any) => {
+		const data = validateOrThrow(authValidation.register, ctx.body);
+		const result = await authServices.register(data);
+		return respons.success("Berhasil register", result, HttpStatus.OK, ctx);
+	},
 
-  profile: async (ctx: any) => {
-    const result = await authServices.profile(ctx.user.id);
-    return respons.success("Berhasil get profile", result, HttpStatus.OK, ctx);
-  },
+	profile: async (ctx: any) => {
+		const result = await authServices.profile(ctx.user.id);
+		return respons.success("Berhasil get profile", result, HttpStatus.OK, ctx);
+	},
 };
 ```
 
@@ -291,29 +285,27 @@ export const authController = {
 ### Request Context (derive global)
 
 ```typescript
-export const requestContext = new Elysia({ name: "request-context" })
-  .derive({ as: "global" }, ({ request }) => ({
-    reqId: request.headers.get("x-request-id") || crypto.randomUUID(),
-    startTime: Date.now(),
-  }));
+export const requestContext = new Elysia({ name: "request-context" }).derive({ as: "global" }, ({ request }) => ({
+	reqId: request.headers.get("x-request-id") || crypto.randomUUID(),
+	startTime: Date.now(),
+}));
 ```
 
 ### Auth (derive global)
 
 ```typescript
-export const verifyToken = new Elysia({ name: "auth" })
-  .derive({ as: "global" }, async ({ headers, set }) => {
-    // Verify JWT, load user from Redis/DB, attach to ctx.user
-  });
+export const verifyToken = new Elysia({ name: "auth" }).derive({ as: "global" }, async ({ headers, set }) => {
+	// Verify JWT, load user from Redis/DB, attach to ctx.user
+});
 ```
 
 ### RBAC (beforeHandle hook)
 
 ```typescript
 export const requirePermission = (resourceName: string, action: string) => {
-  return async (ctx: any) => {
-    // Check ctx.user.roleId against RolePermission + Resource
-  };
+	return async (ctx: any) => {
+		// Check ctx.user.roleId against RolePermission + Resource
+	};
 };
 ```
 
@@ -321,9 +313,9 @@ export const requirePermission = (resourceName: string, action: string) => {
 
 ```typescript
 export const rateLimiter = (options: { windowInSeconds: number; maxRequests: number; useUserId?: boolean }) => {
-  return async (ctx: any) => {
-    // Redis-based sliding window, graceful degradation if Redis unavailable
-  };
+	return async (ctx: any) => {
+		// Redis-based sliding window, graceful degradation if Redis unavailable
+	};
 };
 ```
 

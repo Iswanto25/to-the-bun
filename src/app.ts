@@ -19,9 +19,7 @@ app.listen(
 		hostname: HOST,
 	},
 	() => {
-		const baseUrl = isProd
-			? Bun.env.BASE_URL || `https://${Bun.env.DOMAIN || "yourdomain.com"}`
-			: `http://${HOST}:${PORT}`;
+		const baseUrl = isProd ? Bun.env.BASE_URL || `https://${Bun.env.DOMAIN || "yourdomain.com"}` : `http://${HOST}:${PORT}`;
 
 		console.info("========================================");
 		console.info(`Server is running on Bun ${Bun.version}`);

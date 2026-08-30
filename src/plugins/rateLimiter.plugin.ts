@@ -28,8 +28,7 @@ export function rateLimiter(options?: RateLimitOptions) {
 			const user = ctx.user as AuthUser | undefined;
 			const userId = useUserId && user?.id ? user.id : null;
 			const forwarded = ctx.request?.headers?.get("x-forwarded-for");
-			const ip =
-				forwarded?.split(",")[0].trim() || ctx.server?.requestIP(ctx.request)?.address || "unknown";
+			const ip = forwarded?.split(",")[0].trim() || ctx.server?.requestIP(ctx.request)?.address || "unknown";
 
 			const keyId = userId || ip;
 			const key = `${keyPrefix}${keyId}`;
