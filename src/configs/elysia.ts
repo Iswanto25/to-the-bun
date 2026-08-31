@@ -4,22 +4,6 @@ import { respons, HttpStatus, apiError } from "@/utils/respons.js";
 import apiRoutes from "@/routes/index.js";
 import { requestContext } from "@/plugins/requestContext.plugin.js";
 
-const errorTranslations: Record<string, string> = {
-	"User not found": "User tidak ditemukan",
-	"Invalid email": "Email tidak valid",
-	"Invalid password": "Password salah",
-	"Email already exists": "Email sudah terdaftar",
-	"File not found in storage": "File tidak ditemukan di storage",
-	Forbidden: "Anda tidak memiliki akses",
-	Unauthorized: "Tidak terautentikasi",
-	"Not found": "Tidak ditemukan",
-	"Too many requests": "Terlalu banyak permintaan",
-};
-
-function translateMessage(message: string): string {
-	return errorTranslations[message] || message;
-}
-
 export const app = new Elysia({ name: "boilerplate-bun-elysia" })
 	.onRequest(({ set }) => {
 		set.headers["Content-Security-Policy"] =
@@ -64,21 +48,22 @@ export const app = new Elysia({ name: "boilerplate-bun-elysia" })
 		const { code, error, request, path, set, server } = ctx as any;
 
 		let statusCode = HttpStatus.INTERNAL_SERVER_ERROR;
-		let hint: string | undefined;
+		let rawMessage: string | undefined;
 
-		if (error instanceof apiError) {
-			statusCode = error.statusCode;
-			hint = error.hint;
+		if (error instanceof apiError || (error && typeof error === "object" && "name" in error && (error as any).name === "apiError")) {
+			statusCode = (error as any).statusCode || HttpStatus.INTERNAL_SERVER_ERROR;
+			rawMessage = (error as any).message;
 		} else if (typeof error === "object" && error !== null && "statusCode" in (error as any)) {
 			statusCode = Number((error as any).statusCode);
+			rawMessage = (error as any).message;
 		} else if (typeof error === "object" && error !== null && "status" in (error as any)) {
 			statusCode = Number((error as any).status);
+			rawMessage = (error as any).message;
 		}
 
 		let message: string;
 		if (code === "NOT_FOUND") {
 			statusCode = HttpStatus.NOT_FOUND;
-			hint = "Not Found";
 			message = isProduction ? "Not found" : `Route ${request.method} ${path} not found`;
 		} else if (code === "PARSE") {
 			statusCode = HttpStatus.BAD_REQUEST;
@@ -86,9 +71,11 @@ export const app = new Elysia({ name: "boilerplate-bun-elysia" })
 		} else if (code === "INTERNAL_SERVER_ERROR" && !(error instanceof Error)) {
 			message = "Terjadi kesalahan pada server";
 		} else {
-			const rawMessage = (error instanceof Error && error.message) || "Terjadi kesalahan pada server";
-			message = isProduction && statusCode === HttpStatus.INTERNAL_SERVER_ERROR ? "Internal server error" : translateMessage(rawMessage);
+			message = rawMessage || (error instanceof Error && error.message) || "Terjadi kesalahan pada server";
+			if (isProduction && statusCode === HttpStatus.INTERNAL_SERVER_ERROR) {
+				message = "Internal server error";
+			}
 		}
 
-		return respons.error(message, hint || message, statusCode, { request, set, path, server });
+		return respons.error(message, message, statusCode, { request, set, path, server });
 	});

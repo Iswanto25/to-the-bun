@@ -17,17 +17,17 @@ const folder = "profile";
 export const authServices = {
 	async register(data: RegisterInput) {
 		const result = await authRepository.transaction(async (tx: any) => {
-			if (!isEmailValid(data.email)) throw new apiError(400, "Invalid email");
+			if (!isEmailValid(data.email)) throw new apiError(400, "Email tidak valid");
 
 			const existing = await authRepository.findUserByEmail(data.email, tx);
-			if (existing) throw new apiError(400, "Email already exists");
+			if (existing) throw new apiError(400, "Email sudah terdaftar");
 
 			const hashedPassword = await encryptPassword(data.password);
 
 			const ciphertext = data.NIK ? encryptionUtils.encryptSensitive(data.NIK).ciphertext : null;
 
 			const defaultRole = await tx.role.findUnique({ where: { name: "USER" } });
-			if (!defaultRole) throw new apiError(500, "Default role 'USER' not found");
+			if (!defaultRole) throw new apiError(500, "Role default 'USER' tidak ditemukan");
 
 			const user = await authRepository.createUser(
 				{
@@ -78,13 +78,13 @@ export const authServices = {
 	},
 
 	async login(email: string, password: string) {
-		if (!isEmailValid(email)) throw new apiError(400, "Invalid email");
+		if (!isEmailValid(email)) throw new apiError(400, "Email tidak valid");
 
 		const user = await authRepository.findUserByEmail(email);
-		if (!user) throw new apiError(400, "User not found");
+		if (!user) throw new apiError(400, "User tidak ditemukan");
 
 		const isValid = await comparePassword(password, user.password || "");
-		if (!isValid) throw new apiError(400, "Invalid password");
+		if (!isValid) throw new apiError(400, "Password salah");
 
 		await Promise.all([deleteToken(user.id, "access"), deleteToken(user.id, "refresh")]);
 
@@ -111,10 +111,10 @@ export const authServices = {
 		const decoded = jwtUtils.verifyRefreshToken(oldToken);
 
 		const user = await authRepository.findUserById(decoded.id);
-		if (!user) throw new apiError(400, "User not found");
+		if (!user) throw new apiError(400, "User tidak ditemukan");
 
 		const tokenRecord = await getStoredToken(user.id, "refresh");
-		if (!tokenRecord || tokenRecord !== oldToken) throw new apiError(400, "Invalid token");
+		if (!tokenRecord || tokenRecord !== oldToken) throw new apiError(400, "Token tidak valid");
 
 		await Promise.all([deleteToken(user.id, "access"), deleteToken(user.id, "refresh")]);
 
@@ -135,7 +135,7 @@ export const authServices = {
 
 	async profile(userId: string) {
 		const user = await authRepository.findUserById(userId);
-		if (!user) throw new apiError(400, "User not found");
+		if (!user) throw new apiError(400, "User tidak ditemukan");
 
 		const photoUrl = user.profile?.photo ? getPublicUrl(folder, user.profile.photo) : null;
 
@@ -154,7 +154,7 @@ export const authServices = {
 
 	async sendOtp(input: SendOtpInput): Promise<void> {
 		const user = await authRepository.findUserByEmail(input.email);
-		if (!user) throw new apiError(400, "User not found");
+		if (!user) throw new apiError(400, "User tidak ditemukan");
 
 		const otp = crypto.randomInt(100000, 999999).toString();
 
@@ -171,7 +171,7 @@ export const authServices = {
 
 	async verifyOtp(input: VerifyOtpInput): Promise<void> {
 		const user = await authRepository.findUserByEmail(input.email);
-		if (!user) throw new apiError(400, "User not found");
+		if (!user) throw new apiError(400, "User tidak ditemukan");
 
 		const storedOtp = await getStoredToken(user.id, "otp");
 		if (!storedOtp) throw new apiError(400, "OTP tidak valid atau sudah kedaluwarsa");
@@ -183,7 +183,7 @@ export const authServices = {
 
 	async forgotPassword(email: string): Promise<void> {
 		const user = await authRepository.findUserByEmail(email);
-		if (!user) throw new apiError(400, "User not found");
+		if (!user) throw new apiError(400, "User tidak ditemukan");
 
 		const token = crypto.randomBytes(32).toString("hex");
 		const userName = user.profile?.name || "User";
@@ -192,7 +192,7 @@ export const authServices = {
 			await redisState.client.set(`reset_token:${token}`, user.id, "EX", 900);
 		} else {
 			logger.warn("Redis not available - cannot store reset token");
-			throw new apiError(503, "Service temporarily unavailable");
+			throw new apiError(503, "Layanan tidak tersedia sementara");
 		}
 
 		const frontendUrl = Bun.env.FRONTEND_URL || Bun.env.BASE_URL || "http://localhost:3000";
@@ -223,7 +223,7 @@ export const authServices = {
 
 	async updateProfile(userId: string, data: UpdateProfileInput): Promise<void> {
 		const currentUser = await authRepository.findUserById(userId);
-		if (!currentUser) throw new apiError(400, "User not found");
+		if (!currentUser) throw new apiError(400, "User tidak ditemukan");
 
 		await authRepository.transaction(async (tx: any) => {
 			let encryptNik: string | undefined = undefined;
@@ -233,9 +233,9 @@ export const authServices = {
 
 			let newEmail: string | undefined = undefined;
 			if (data.email && data.email !== currentUser.email) {
-				if (!isEmailValid(data.email)) throw new apiError(400, "Invalid email format");
+				if (!isEmailValid(data.email)) throw new apiError(400, "Format email tidak valid");
 				const existing = await authRepository.findUserByEmail(data.email, tx);
-				if (existing) throw new apiError(400, "Email already exists");
+				if (existing) throw new apiError(400, "Email sudah terdaftar");
 				newEmail = data.email;
 			}
 
@@ -252,7 +252,7 @@ export const authServices = {
 
 	async updatePhoto(userId: string, file: File): Promise<void> {
 		const currentUser = await authRepository.findUserById(userId);
-		if (!currentUser) throw new apiError(400, "User not found");
+		if (!currentUser) throw new apiError(400, "User tidak ditemukan");
 
 		const oldPhotoFileName = currentUser.profile?.photo || undefined;
 
@@ -271,7 +271,7 @@ export const authServices = {
 
 	async updatePhotoDirect(userId: string, contentType?: string): Promise<{ presignedUrl: string; fileName: string; publicUrl: string }> {
 		const currentUser = await authRepository.findUserById(userId);
-		if (!currentUser) throw new apiError(400, "User not found");
+		if (!currentUser) throw new apiError(400, "User tidak ditemukan");
 
 		const ext = contentType ? contentType.split("/")[1] || "jpg" : "jpg";
 		const { url, key, publicUrl } = await getPresignedUploadUrl(folder, {
@@ -290,7 +290,7 @@ export const authServices = {
 	async deleteProfile(userId: string): Promise<void> {
 		await authRepository.transaction(async (tx: any) => {
 			const user = await authRepository.findUserById(userId, tx);
-			if (!user) throw new apiError(400, "User not found");
+			if (!user) throw new apiError(400, "User tidak ditemukan");
 
 			const photoFileName = user.profile?.photo;
 

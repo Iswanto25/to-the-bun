@@ -1,7 +1,7 @@
 import { Elysia } from "elysia";
 import prisma from "@/configs/database.js";
 import { jwtUtils } from "@/utils/jwt.js";
-import { apiError } from "@/utils/respons.js";
+import { respons, HttpStatus } from "@/utils/respons.js";
 import { getStoredToken } from "@/utils/tokenStore.js";
 import type { AuthUser } from "@/plugins/requestContext.plugin.js";
 
@@ -29,28 +29,51 @@ export const authenticate = {
 	},
 };
 
-export const verifyToken = new Elysia({ name: "auth-verify-token" }).derive({ as: "global" }, async (ctx: any): Promise<{ user: AuthUser }> => {
-	const result = await authenticate.checkToken(ctx.request);
-	if (!result.valid || !result.userId) {
-		throw new apiError(401, "Unauthorized", "Token tidak valid");
-	}
+export const verifyToken = new Elysia({ name: "auth-verify-token" })
+	.derive({ as: "scoped" }, async (ctx: any) => {
+		const result = await authenticate.checkToken(ctx.request);
+		if (!result.valid || !result.userId) {
+			return {
+				user: null,
+				authError: respons.error("Tidak terautentikasi", "Tidak terautentikasi", HttpStatus.UNAUTHORIZED, {
+					request: ctx.request,
+					set: ctx.set,
+					path: ctx.path,
+					server: ctx.server,
+				}),
+			};
+		}
 
-	const existingUser = await prisma.user.findUnique({
-		where: { id: result.userId },
-		include: { profile: true, role: true },
+		const existingUser = await prisma.user.findUnique({
+			where: { id: result.userId },
+			include: { profile: true, role: true },
+		});
+
+		if (!existingUser) {
+			return {
+				user: null,
+				authError: respons.error("User tidak ditemukan", "User tidak ditemukan", HttpStatus.UNAUTHORIZED, {
+					request: ctx.request,
+					set: ctx.set,
+					path: ctx.path,
+					server: ctx.server,
+				}),
+			};
+		}
+
+		return {
+			user: {
+				id: existingUser.id,
+				email: existingUser.email,
+				roleId: existingUser.roleId,
+				roleName: existingUser.role.name,
+				profile: existingUser.profile,
+			} as AuthUser,
+			authError: null,
+		};
+	})
+	.onBeforeHandle({ as: "scoped" }, (ctx: any) => {
+		if (ctx.authError) {
+			return ctx.authError;
+		}
 	});
-
-	if (!existingUser) {
-		throw new apiError(401, "User not found", "User tidak ditemukan");
-	}
-
-	return {
-		user: {
-			id: existingUser.id,
-			email: existingUser.email,
-			roleId: existingUser.roleId,
-			roleName: existingUser.role.name,
-			profile: existingUser.profile,
-		},
-	};
-});

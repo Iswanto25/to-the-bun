@@ -23,6 +23,7 @@
 		"test:infra": "bun test __tests__/infrastructure/",
 		"generate-api-key": "bun run scripts/generateApiKey.ts",
 		"generate-data": "bun run src/utils/generateData.ts",
+		"seed": "bun run prisma db seed",
 		"cleanup": "bash scripts/cleanup-boilerplate.sh"
 	},
 	"author": "",
