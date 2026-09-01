@@ -1,8 +1,9 @@
 import { Elysia } from "elysia";
 import { cors } from "@elysiajs/cors";
 import { respons, HttpStatus, apiError } from "@/utils/respons.js";
-import apiRoutes from "@/routes/index.js";
+import apiRoutes, { apiRoutes } from "@/routes/index.js";
 import { requestContext } from "@/plugins/requestContext.plugin.js";
+import { errorHandlerPlugin } from "@/plugins/errorHandler.plugin";
 
 export const app = new Elysia({ name: "boilerplate-bun-elysia" })
 	.onRequest(({ set }) => {
@@ -43,6 +44,7 @@ export const app = new Elysia({ name: "boilerplate-bun-elysia" })
 		return respons.success("Service is healthy", data, HttpStatus.OK, ctx);
 	})
 	.use(apiRoutes)
+	.use(errorHandlerPlugin)
 	.onError((ctx) => {
 		const isProduction = Bun.env.NODE_ENV === "production";
 		const { code, error, request, path, set, server } = ctx as any;
@@ -79,3 +81,4 @@ export const app = new Elysia({ name: "boilerplate-bun-elysia" })
 
 		return respons.error(message, message, statusCode, { request, set, path, server });
 	});
+	
