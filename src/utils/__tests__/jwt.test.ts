@@ -1,67 +1,58 @@
-import { test, expect, mock } from "bun:test";
-
-const signMock = mock(() => "mock-jwt-token");
-const verifyMock = mock(() => ({ id: "user-1", role: "admin" }));
-
-mock.module("jsonwebtoken", () => ({
-	default: {
-		sign: signMock,
-		verify: verifyMock,
-	},
-}));
+import { test, expect } from "bun:test";
+import * as jose from "jose";
 
 process.env.JWT_SECRET = "test-secret";
 process.env.JWT_REFRESH_SECRET = "test-refresh-secret";
 
 const { jwtUtils } = await import("@/utils/jwt.js");
 
-test("jwtUtils.generateAccessToken calls jwt.sign with correct args", () => {
-	signMock.mockClear();
-	signMock.mockReturnValue("access-token-123");
-
+test("jwtUtils.generateAccessToken returns a valid JWT string", async () => {
 	const payload = { id: "user-1", role: "admin" };
-	const token = jwtUtils.generateAccessToken(payload);
+	const token = await jwtUtils.generateAccessToken(payload);
 
-	expect(token).toBe("access-token-123");
-	expect(signMock).toHaveBeenCalledWith(payload, "test-secret", { expiresIn: "1d" });
+	expect(typeof token).toBe("string");
+	expect(token.split(".")).toHaveLength(3);
+
+	const { payload: decoded } = await jose.jwtVerify(token, new TextEncoder().encode("test-secret"));
+	expect(decoded.id).toBe("user-1");
+	expect(decoded.role).toBe("admin");
 });
 
-test("jwtUtils.generateRefreshToken calls jwt.sign with refresh secret", () => {
-	signMock.mockClear();
-	signMock.mockReturnValue("refresh-token-456");
-
+test("jwtUtils.generateRefreshToken returns a valid JWT string with refresh secret", async () => {
 	const payload = { id: "user-1" };
-	const token = jwtUtils.generateRefreshToken(payload);
+	const token = await jwtUtils.generateRefreshToken(payload);
 
-	expect(token).toBe("refresh-token-456");
-	expect(signMock).toHaveBeenCalledWith(payload, "test-refresh-secret", { expiresIn: "7d" });
+	expect(typeof token).toBe("string");
+	expect(token.split(".")).toHaveLength(3);
+
+	const { payload: decoded } = await jose.jwtVerify(token, new TextEncoder().encode("test-refresh-secret"));
+	expect(decoded.id).toBe("user-1");
 });
 
-test("jwtUtils.verifyAccessToken calls jwt.verify with correct secret", () => {
-	verifyMock.mockClear();
-	verifyMock.mockReturnValue({ id: "user-1", role: "admin" });
+test("jwtUtils.verifyAccessToken verifies a valid token", async () => {
+	const token = await new jose.SignJWT({ id: "user-1", role: "admin" })
+		.setProtectedHeader({ alg: "HS256" })
+		.setIssuedAt()
+		.setExpirationTime("1d")
+		.sign(new TextEncoder().encode("test-secret"));
 
-	const result = jwtUtils.verifyAccessToken("some-token");
-
-	expect(result).toEqual({ id: "user-1", role: "admin" });
-	expect(verifyMock).toHaveBeenCalledWith("some-token", "test-secret");
+	const decoded = await jwtUtils.verifyAccessToken(token);
+	expect(decoded.id).toBe("user-1");
+	expect(decoded.role).toBe("admin");
 });
 
-test("jwtUtils.verifyRefreshToken calls jwt.verify with refresh secret", () => {
-	verifyMock.mockClear();
-	verifyMock.mockReturnValue({ id: "user-1", role: "user" });
+test("jwtUtils.verifyRefreshToken verifies a valid refresh token", async () => {
+	const token = await new jose.SignJWT({ id: "user-1", role: "user" })
+		.setProtectedHeader({ alg: "HS256" })
+		.setIssuedAt()
+		.setExpirationTime("7d")
+		.sign(new TextEncoder().encode("test-refresh-secret"));
 
-	const result = jwtUtils.verifyRefreshToken("refresh-token");
-
-	expect(result).toEqual({ id: "user-1", role: "user" });
-	expect(verifyMock).toHaveBeenCalledWith("refresh-token", "test-refresh-secret");
+	const decoded = await jwtUtils.verifyRefreshToken(token);
+	expect(decoded.id).toBe("user-1");
+	expect(decoded.role).toBe("user");
 });
 
-test("jwtUtils.verifyAccessToken throws on invalid token", () => {
-	verifyMock.mockClear();
-	verifyMock.mockImplementation(() => {
-		throw new Error("jwt malformed");
-	});
-
-	expect(() => jwtUtils.verifyAccessToken("invalid")).toThrow("jwt malformed");
+test("jwtUtils.verifyAccessToken rejects an invalid token", async () => {
+	await expect(jwtUtils.verifyAccessToken("invalid-token")).rejects.toThrow();
 });

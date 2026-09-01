@@ -1,49 +1,37 @@
+// src/plugins/errorHandler.plugin.ts
 import Elysia from "elysia";
-import { apiError } from "@/utils/respons.js";
+import { respons, apiError, HttpStatus } from "@/utils/respons.js";
 
-function serializeError(error: unknown): Record<string, unknown> {
-	if (error instanceof apiError) {
-		return { name: error.name, message: error.message, statusCode: error.statusCode, hint: error.hint };
-	}
-	if (error instanceof Error) {
-		return { name: error.name, message: error.message };
-	}
-	if (typeof error === "object" && error !== null) {
-		return error as Record<string, unknown>;
-	}
-	return { message: String(error) };
-}
+export const errorHandlerPlugin = new Elysia()
+    .as("global") // <--- TAMBAHKAN INI agar hook onError menembus ke sub-plugin (apiRoutes)
+    .onError((ctx) => {
+        const { code, error, request, set, body, query, path, server } = ctx;
 
-export const errorHandlerPlugin = new Elysia().onError(({ code, error, status }) => {
-	if (error instanceof apiError) {
-		return status(error.statusCode, {
-			success: false,
-			message: error.message,
-			error: serializeError(error),
-		});
-	}
+        const responsCtx = {
+            request,
+            set,
+            body,
+            query,
+            path,
+            reqId: request.headers.get("x-request-id") || crypto.randomUUID(),
+            startTime: (ctx as any).startTime || Date.now(),
+            server: server as any,
+            user: (ctx as any).user
+        };
 
-	if (code === "VALIDATION") {
-		const detail = (error as any)?.all ?? error;
-		return status(400, {
-			success: false,
-			message: "Validation Error",
-			error: serializeError(detail),
-		});
-	}
+        if (error && typeof error === "object" && "isApiError" in error && (error as apiError).isApiError) {
+            const apiErr = error as apiError;
+            return respons.error(apiErr.message, apiErr, apiErr.statusCode, responsCtx);
+        }
 
-	if (code === "NOT_FOUND") {
-		return status(404, {
-			success: false,
-			message: "Route Not Found",
-			error: null,
-		});
-	}
+        if (code === "VALIDATION") {
+            return respons.error("Validation Error", error.all, HttpStatus.BAD_REQUEST, responsCtx);
+        }
 
-	const message = error instanceof Error ? error.message : "Internal Server Error";
-	return status(500, {
-		success: false,
-		message,
-		error: serializeError(error),
-	});
-});
+        if (code === "NOT_FOUND") {
+            return respons.error("Route Not Found", null, HttpStatus.NOT_FOUND, responsCtx);
+        }
+
+        const message = error instanceof Error ? error.message : "Internal Server Error";
+        return respons.error(message, error, HttpStatus.INTERNAL_SERVER_ERROR, responsCtx);
+    });

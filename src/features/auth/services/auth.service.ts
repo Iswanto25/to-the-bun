@@ -45,8 +45,10 @@ export const authServices = {
 				tx,
 			);
 
-			const accessToken = jwtUtils.generateAccessToken({ id: user.id, email: user.email });
-			const refreshToken = jwtUtils.generateRefreshToken({ id: user.id, email: user.email });
+			const [accessToken, refreshToken] = await Promise.all([
+				jwtUtils.generateAccessToken({ id: user.id, email: user.email }),
+				jwtUtils.generateRefreshToken({ id: user.id, email: user.email }),
+			]);
 
 			await Promise.all([
 				storeToken(user.id, accessToken, "access", 24 * 60 * 60),
@@ -88,8 +90,10 @@ export const authServices = {
 
 		await Promise.all([deleteToken(user.id, "access"), deleteToken(user.id, "refresh")]);
 
-		const accessToken = jwtUtils.generateAccessToken({ id: user.id, email: user.email });
-		const refreshToken = jwtUtils.generateRefreshToken({ id: user.id, email: user.email });
+		const [accessToken, refreshToken] = await Promise.all([
+			jwtUtils.generateAccessToken({ id: user.id, email: user.email }),
+			jwtUtils.generateRefreshToken({ id: user.id, email: user.email }),
+		]);
 
 		await Promise.all([storeToken(user.id, accessToken, "access", 24 * 60 * 60), storeToken(user.id, refreshToken, "refresh", 7 * 24 * 60 * 60)]);
 
@@ -108,7 +112,7 @@ export const authServices = {
 	},
 
 	async refreshToken(oldToken: string) {
-		const decoded = jwtUtils.verifyRefreshToken(oldToken);
+		const decoded = (await jwtUtils.verifyRefreshToken(oldToken)) as unknown as { id: string; email: string };
 
 		const user = await authRepository.findUserById(decoded.id);
 		if (!user) throw new apiError(400, "User tidak ditemukan");
@@ -118,8 +122,10 @@ export const authServices = {
 
 		await Promise.all([deleteToken(user.id, "access"), deleteToken(user.id, "refresh")]);
 
-		const newAccessToken = jwtUtils.generateAccessToken({ id: user.id, email: user.email });
-		const newRefreshToken = jwtUtils.generateRefreshToken({ id: user.id, email: user.email });
+		const [newAccessToken, newRefreshToken] = await Promise.all([
+			jwtUtils.generateAccessToken({ id: user.id, email: user.email }),
+			jwtUtils.generateRefreshToken({ id: user.id, email: user.email }),
+		]);
 
 		await Promise.all([
 			storeToken(user.id, newAccessToken, "access", 24 * 60 * 60),

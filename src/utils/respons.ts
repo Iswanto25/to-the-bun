@@ -183,15 +183,16 @@ export const respons = {
 };
 
 export class apiError extends Error {
-	public statusCode: number;
-	public hint?: string;
+    public statusCode: number;
+    public hint?: string;
+    public readonly isApiError = true;
 
-	constructor(statusCode: number, message: string, hint?: string) {
-		super(message);
-		this.name = "apiError";
-		this.statusCode = statusCode;
-		this.hint = hint;
-	}
+    constructor(statusCode: number, message: string, hint?: string) {
+        super(message);
+        this.name = "apiError";
+        this.statusCode = statusCode;
+        this.hint = hint;
+    }
 }
 
 export const validateOrThrow = <T>(

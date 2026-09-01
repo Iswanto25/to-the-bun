@@ -1,19 +1,29 @@
-import jwt from "jsonwebtoken";
+import * as jose from "jose";
 
-const JWT_SECRET = Bun.env.JWT_SECRET as string;
-const JWT_REFRESH_SECRET = Bun.env.JWT_REFRESH_SECRET as string;
+const JWT_SECRET = new TextEncoder().encode(Bun.env.JWT_SECRET);
+const JWT_REFRESH_SECRET = new TextEncoder().encode(Bun.env.JWT_REFRESH_SECRET);
 
 export const jwtUtils = {
-	generateAccessToken: (payload: object) => {
-		return jwt.sign(payload, JWT_SECRET, { expiresIn: "1d" });
+	generateAccessToken: async (payload: Record<string, unknown>) => {
+		return new jose.SignJWT(payload)
+			.setProtectedHeader({ alg: "HS256" })
+			.setIssuedAt()
+			.setExpirationTime("1d")
+			.sign(JWT_SECRET);
 	},
-	generateRefreshToken: (payload: object) => {
-		return jwt.sign(payload, JWT_REFRESH_SECRET, { expiresIn: "7d" });
+	generateRefreshToken: async (payload: Record<string, unknown>) => {
+		return new jose.SignJWT(payload)
+			.setProtectedHeader({ alg: "HS256" })
+			.setIssuedAt()
+			.setExpirationTime("7d")
+			.sign(JWT_REFRESH_SECRET);
 	},
-	verifyAccessToken: (token: string) => {
-		return jwt.verify(token, JWT_SECRET) as jwt.JwtPayload;
+	verifyAccessToken: async (token: string) => {
+		const { payload } = await jose.jwtVerify(token, JWT_SECRET);
+		return payload;
 	},
-	verifyRefreshToken: (token: string) => {
-		return jwt.verify(token, JWT_REFRESH_SECRET) as jwt.JwtPayload;
+	verifyRefreshToken: async (token: string) => {
+		const { payload } = await jose.jwtVerify(token, JWT_REFRESH_SECRET);
+		return payload;
 	},
 };

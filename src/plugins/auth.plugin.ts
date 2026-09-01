@@ -19,7 +19,7 @@ export const authenticate = {
 
 		const token = authHeader.split(" ")[1];
 		try {
-			const decoded = jwtUtils.verifyAccessToken(token) as unknown as DecodedToken;
+			const decoded = (await jwtUtils.verifyAccessToken(token)) as unknown as DecodedToken;
 			const storedToken = await getStoredToken(decoded.id, "access");
 			if (storedToken !== token) return { valid: false };
 			return { valid: true, userId: decoded.id };
