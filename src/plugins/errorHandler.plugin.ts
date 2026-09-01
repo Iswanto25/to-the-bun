@@ -1,5 +1,5 @@
 import Elysia from "elysia";
-import { respons, apiError, HttpStatus } from "@/utils/respons.js";
+import { apiError, HttpStatus } from "@/utils/respons.js";
 
 function serializeError(error: unknown): Record<string, unknown> {
 	if (error instanceof apiError) {
@@ -14,33 +14,31 @@ function serializeError(error: unknown): Record<string, unknown> {
 	return { message: String(error) };
 }
 
-export const errorHandlerPlugin = new Elysia().onError((ctx) => {
-	const { code, error, request, set, body, query, path, server } = ctx;
-
-	const responsCtx = {
-		request,
-		set,
-		body,
-		query,
-		path,
-		reqId: request.headers.get("x-request-id") || crypto.randomUUID(),
-		startTime: (ctx as any).startTime || Date.now(),
-		server: server as any,
+function jsonError(message: string, error: unknown, statusCode: number, set: any) {
+	set.status = statusCode;
+	return {
+		success: false,
+		message,
+		error,
 	};
+}
+
+export const errorHandlerPlugin = new Elysia().onError((ctx) => {
+	const { code, error, set } = ctx;
 
 	if (error instanceof apiError) {
-		return respons.error(error.message, serializeError(error), error.statusCode, responsCtx);
+		return jsonError(error.message, serializeError(error), error.statusCode, set);
 	}
 
 	if (code === "VALIDATION") {
 		const detail = error?.all ?? error;
-		return respons.error("Validation Error", serializeError(detail), HttpStatus.BAD_REQUEST, responsCtx);
+		return jsonError("Validation Error", serializeError(detail), HttpStatus.BAD_REQUEST, set);
 	}
 
 	if (code === "NOT_FOUND") {
-		return respons.error("Route Not Found", null, HttpStatus.NOT_FOUND, responsCtx);
+		return jsonError("Route Not Found", null, HttpStatus.NOT_FOUND, set);
 	}
 
 	const message = error instanceof Error ? error.message : "Internal Server Error";
-	return respons.error(message, serializeError(error), HttpStatus.INTERNAL_SERVER_ERROR, responsCtx);
+	return jsonError(message, serializeError(error), HttpStatus.INTERNAL_SERVER_ERROR, set);
 });
