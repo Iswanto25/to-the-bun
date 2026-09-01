@@ -1,9 +1,9 @@
 import { Elysia } from "elysia";
 import { cors } from "@elysiajs/cors";
-import { respons, HttpStatus, apiError } from "@/utils/respons.js";
-import apiRoutes, { apiRoutes } from "@/routes/index.js";
+import { respons, HttpStatus } from "@/utils/respons.js";
+import apiRoutes from "@/routes/index.js";
 import { requestContext } from "@/plugins/requestContext.plugin.js";
-import { errorHandlerPlugin } from "@/plugins/errorHandler.plugin";
+import { errorHandlerPlugin } from "@/plugins/errorHandler.plugin.js";
 
 export const app = new Elysia({ name: "boilerplate-bun-elysia" })
 	.onRequest(({ set }) => {
@@ -44,41 +44,4 @@ export const app = new Elysia({ name: "boilerplate-bun-elysia" })
 		return respons.success("Service is healthy", data, HttpStatus.OK, ctx);
 	})
 	.use(apiRoutes)
-	.use(errorHandlerPlugin)
-	.onError((ctx) => {
-		const isProduction = Bun.env.NODE_ENV === "production";
-		const { code, error, request, path, set, server } = ctx as any;
-
-		let statusCode = HttpStatus.INTERNAL_SERVER_ERROR;
-		let rawMessage: string | undefined;
-
-		if (error instanceof apiError || (error && typeof error === "object" && "name" in error && (error as any).name === "apiError")) {
-			statusCode = (error as any).statusCode || HttpStatus.INTERNAL_SERVER_ERROR;
-			rawMessage = (error as any).message;
-		} else if (typeof error === "object" && error !== null && "statusCode" in (error as any)) {
-			statusCode = Number((error as any).statusCode);
-			rawMessage = (error as any).message;
-		} else if (typeof error === "object" && error !== null && "status" in (error as any)) {
-			statusCode = Number((error as any).status);
-			rawMessage = (error as any).message;
-		}
-
-		let message: string;
-		if (code === "NOT_FOUND") {
-			statusCode = HttpStatus.NOT_FOUND;
-			message = isProduction ? "Not found" : `Route ${request.method} ${path} not found`;
-		} else if (code === "PARSE") {
-			statusCode = HttpStatus.BAD_REQUEST;
-			message = "Format request tidak valid";
-		} else if (code === "INTERNAL_SERVER_ERROR" && !(error instanceof Error)) {
-			message = "Terjadi kesalahan pada server";
-		} else {
-			message = rawMessage || (error instanceof Error && error.message) || "Terjadi kesalahan pada server";
-			if (isProduction && statusCode === HttpStatus.INTERNAL_SERVER_ERROR) {
-				message = "Internal server error";
-			}
-		}
-
-		return respons.error(message, message, statusCode, { request, set, path, server });
-	});
-	
+	.use(errorHandlerPlugin);
