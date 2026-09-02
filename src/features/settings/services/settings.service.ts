@@ -8,7 +8,7 @@ export const settingsServices = {
 
 	async getDetailLogs(id: number) {
 		const log = await settingsRepository.getDetailLogs(id);
-		if (!log) throw new apiError(404, "Log tidak ditemukan");
+		if (!log) throw new apiError(404, "Log tidak ditemukan", "Log tidak ditemukan");
 		return log;
 	},
 };

@@ -58,12 +58,28 @@ export const errorHandlerPlugin = new Elysia()
 			);
 		}
 
+		// Elysia NOT_FOUND (route not found)
+		if (code === "NOT_FOUND") {
+			return jsonResponse(
+				{
+					success: false,
+					message: `Route ${path} tidak ditemukan`,
+					error: `Route ${path} tidak ditemukan`,
+				},
+				HttpStatus.NOT_FOUND,
+			);
+		}
+
 		// Fallback — internal server error
 		const message = error instanceof Error ? error.message : "Internal Server Error";
+		const hint = (error as any)?.hint || (error as any)?.code || undefined;
+		logger.error({ level: "ERROR", path, method: request?.method, message, hint });
+
 		return jsonResponse(
 			{
 				success: false,
 				message,
+				...(hint ? { hint } : {}),
 				error: message,
 			},
 			HttpStatus.INTERNAL_SERVER_ERROR,

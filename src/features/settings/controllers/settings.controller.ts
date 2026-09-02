@@ -11,7 +11,10 @@ export const settingsController = {
 	},
 
 	getDetailLogs: async (ctx: any) => {
-		const id = ctx.params.id ? Number(ctx.params.id) : 0;
+		const id = Number(ctx.params.id);
+		if (isNaN(id) || id <= 0) {
+			return respons.error("Log tidak ditemukan", "Log tidak ditemukan", HttpStatus.NOT_FOUND, ctx);
+		}
 		const result = await settingsServices.getDetailLogs(id);
 		return respons.success("Berhasil mengambil detail log", result, HttpStatus.OK, ctx);
 	},

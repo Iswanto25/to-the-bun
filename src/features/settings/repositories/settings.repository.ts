@@ -1,6 +1,7 @@
 import prisma from "@/configs/database.js";
 import { Prisma } from "@prisma/client";
 import { paginate } from "@/utils/pagination.js";
+import { apiError } from "@/utils/respons.js";
 
 type TxClient = Prisma.TransactionClient;
 
@@ -46,20 +47,24 @@ export const settingsRepository = {
 	},
 
 	getDetailLogs: async (id: number, tx: TxClient = prisma) => {
-		return await tx.logs.findUnique({
-			where: { id },
-			select: {
-				id: true,
-				date: true,
-				name: true,
-				role: true,
-				reqId: true,
-				method: true,
-				ip: true,
-				status: true,
-				host: true,
-				data: true,
-			},
-		});
+		try {
+			return await tx.logs.findUnique({
+				where: { id },
+				select: {
+					id: true,
+					date: true,
+					name: true,
+					role: true,
+					reqId: true,
+					method: true,
+					ip: true,
+					status: true,
+					host: true,
+					data: true,
+				},
+			});
+		} catch (err) {
+			throw new apiError(500, "Gagal mengambil detail log", err instanceof Error ? err.message : String(err));
+		}
 	},
 };
