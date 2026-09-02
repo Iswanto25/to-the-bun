@@ -13,34 +13,19 @@ function jsonResponse(data: unknown, status: number): Response {
 export const errorHandlerPlugin = new Elysia()
 	.as("global")
 	.onError((ctx) => {
-		const { code, error, request, set, body, query, path, server } = ctx;
+		const { code, error, request, path } = ctx;
 
-		const responsCtx = {
-			request,
-			set,
-			body,
-			query,
-			path,
-			reqId: request.headers.get("x-request-id") || crypto.randomUUID(),
-			startTime: (ctx as any).startTime || Date.now(),
-			server: server as any,
-			user: (ctx as any).user,
-		};
-
-		// apiError — custom application error
-		if (error && typeof error === "object" && "isApiError" in error && (error as apiError).isApiError) {
-			const apiErr = error as apiError;
-			const hint = apiErr.hint || undefined;
-
+		// apiError — Elysia uses .status and .toResponse() automatically
+		if (error instanceof apiError) {
 			const logPayload = {
 				level: "ERROR",
 				path,
 				method: request.method,
-				status: apiErr.statusCode,
-				reqId: responsCtx.reqId,
-				message: apiErr.message,
-				hint,
-				error: apiErr.message,
+				status: error.status,
+				reqId: request.headers.get("x-request-id") || crypto.randomUUID(),
+				message: error.message,
+				hint: error.hint,
+				error: error.message,
 			};
 
 			logger.error(logPayload);
@@ -51,22 +36,14 @@ export const errorHandlerPlugin = new Elysia()
 				role: (ctx as any).user?.roleName || null,
 				ip: request.headers.get("x-forwarded-for")?.split(",")[0].trim() || "unknown",
 				host: request.url,
-				status: apiErr.statusCode.toString(),
+				status: error.status.toString(),
 				method: request.method,
-				reqId: responsCtx.reqId,
+				reqId: logPayload.reqId,
 				data: logPayload,
 				date: new Date(),
 			});
 
-			return jsonResponse(
-				{
-					success: false,
-					message: apiErr.message,
-					...(hint && { hint }),
-					error: apiErr.message,
-				},
-				apiErr.statusCode,
-			);
+			return jsonResponse(error.toResponse(), error.status);
 		}
 
 		// Elysia validation error
@@ -81,25 +58,13 @@ export const errorHandlerPlugin = new Elysia()
 			);
 		}
 
-		// Route not found
-		if (code === "NOT_FOUND") {
-			return jsonResponse(
-				{
-					success: false,
-					message: "Route Not Found",
-					error: null,
-				},
-				HttpStatus.NOT_FOUND,
-			);
-		}
-
 		// Fallback — internal server error
 		const message = error instanceof Error ? error.message : "Internal Server Error";
 		return jsonResponse(
 			{
 				success: false,
 				message,
-				error,
+				error: message,
 			},
 			HttpStatus.INTERNAL_SERVER_ERROR,
 		);

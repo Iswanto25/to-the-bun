@@ -183,15 +183,24 @@ export const respons = {
 };
 
 export class apiError extends Error {
-    public statusCode: number;
+    public status: number;
     public hint?: string;
     public readonly isApiError = true;
 
-    constructor(statusCode: number, message: string, hint?: string) {
+    constructor(status: number, message: string, hint?: string) {
         super(message);
         this.name = "apiError";
-        this.statusCode = statusCode;
+        this.status = status;
         this.hint = hint;
+    }
+
+    toResponse() {
+        return {
+            success: false,
+            message: this.message,
+            ...(this.hint && { hint: this.hint }),
+            error: this.message,
+        };
     }
 }
 

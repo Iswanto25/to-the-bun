@@ -1,6 +1,7 @@
 import { Elysia } from "elysia";
 import { cors } from "@elysiajs/cors";
 import { jwt } from "@elysia/jwt";
+import { apiError } from "@/utils/respons.js";
 import { respons, HttpStatus } from "@/utils/respons.js";
 import apiRoutes from "@/routes/index.js";
 import { requestContext } from "@/plugins/requestContext.plugin.js";
@@ -40,6 +41,9 @@ export const app = new Elysia({ name: "boilerplate-bun-elysia" })
             secret: Bun.env.JWT_SECRET!,
         }),
     )
+    .error({
+        "ApiError": apiError,
+    })
     .use(errorHandlerPlugin)
     .get("/", ({ redirect }) => redirect("/health"))
     .get("/health", (ctx) => {
@@ -52,4 +56,11 @@ export const app = new Elysia({ name: "boilerplate-bun-elysia" })
         return respons.success("Service is healthy", data, HttpStatus.OK, ctx);
     })
     .use(apiRoutes)
+    .all("/*", ({ path }) => {
+        return {
+            success: false,
+            message: `Route ${path} tidak ditemukan`,
+            error: null,
+        };
+    })
     .listen(3000);
